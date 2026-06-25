@@ -2,54 +2,55 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
-## Project Overview
+## 铁律（绝对不能违反）
 
-**Myriad (万镜)** — A decentralized, cross-platform system monitoring dashboard. Devices connect directly via IP, each instance acts as both Server (data collection) and Client (visualization). No central server required.
+1. **必须使用中文** — 所有交流、回复、解释一律使用中文，代码注释优先中文
+2. **默认只 commit，绝对不要 push** — 完成修改后执行 `git commit` 即可，只有用户明确说「推送」或「push」时才执行 `git push`
+3. **不确定就问，不要猜** — 任何不确定的事情都要先问用户，不要自作主张
+4. **遵循 Conventional Commits** — commit message 格式：`feat: 新增 xxx`、`fix: 修复 xxx`、`docs: 更新 xxx`
 
-## Tech Stack
+## 项目概述
 
-- **Framework**: Flutter 3.x (Desktop: Windows / macOS / Linux)
-- **State Management**: Riverpod
-- **System Info**: `system_info2` / `dart:ffi` for native API calls
-- **Communication**: WebSocket (`shelf` + `web_socket_channel`)
-- **Charts**: `fl_chart`
-- **Blur Effects**: `BackdropFilter` + `ImageFilter.blur`
-- **Local Storage**: `hive` / `shared_preferences`
+**Myriad (万镜)** — 去中心化的跨平台系统监控面板。设备间通过 IP 直连，每个实例既是 Server（采集数据）又是 Client（展示数据），无需中心服务器。
 
-## Common Commands
+## 技术栈
+
+- **框架**: Flutter 3.x (桌面端: Windows / macOS / Linux)
+- **状态管理**: Riverpod
+- **系统信息采集**: `system_info2` / `dart:ffi`
+- **设备间通信**: WebSocket (`shelf` + `web_socket_channel`)
+- **图表渲染**: `fl_chart`
+- **高斯模糊**: `BackdropFilter` + `ImageFilter.blur`
+- **本地存储**: `hive` / `shared_preferences`
+
+## 常用命令
 
 ```bash
-# Install dependencies
+# 安装依赖
 flutter pub get
 
-# Run desktop app (Windows)
-flutter run -d windows
+# 运行桌面应用
+flutter run -d windows    # Windows
+flutter run -d macos      # macOS
+flutter run -d linux      # Linux
 
-# Run desktop app (macOS)
-flutter run -d macos
-
-# Run desktop app (Linux)
-flutter run -d linux
-
-# Build release
+# 构建发布版
 flutter build windows
 flutter build macos
 flutter build linux
 
-# Run tests
+# 运行测试
 flutter test
-
-# Run single test file
 flutter test test/path/to/test.dart
 
-# Analyze code
+# 代码分析
 flutter analyze
 
-# Format code
+# 格式化代码
 dart format .
 ```
 
-## Architecture
+## 架构
 
 ```
 ┌─────────────────────────────────────────┐
@@ -64,20 +65,44 @@ dart format .
 └─────────────────────────────────────────┘
 ```
 
-### Key Modules
+### 核心模块
 
-- **Server Module**: Collects system metrics (CPU, memory, GPU, disk, network) and pushes via WebSocket
-- **Client Module**: Displays device list and real-time monitoring charts
-- **Each instance is both**: Can monitor other devices and be monitored
+- **Server 模块**: 采集系统指标（CPU、内存、GPU、磁盘、网络），通过 WebSocket 推送
+- **Client 模块**: 展示设备列表和实时监控图表
+- **每个实例都是双向的**: 可以监控其他设备，也可以被其他设备监控
 
-### Pages
+### 页面
 
-1. **Home (设备列表页)**: Device cards with name, OS, status indicator; Gaussian blur background
-2. **Detail (设备详情页)**: Real-time charts for CPU, memory, GPU, disk, network
+1. **设备列表页 (Home)**: 设备卡片，显示设备名、OS、状态指示灯，高斯模糊背景
+2. **设备详情页 (Detail)**: CPU、内存、GPU、磁盘、网络的实时图表
 
-## Code Style
+## 代码风格
 
-- Follow Dart/Flutter conventions
-- Use Riverpod for state management
-- Prefer `const` constructors where possible
-- Use meaningful widget names in Chinese comments for UI sections
+- 遵循 Dart/Flutter 规范
+- 使用 Riverpod 状态管理
+- 优先使用 `const` 构造函数
+- UI 部分使用中文注释标注 widget 用途
+
+## Git 规范
+
+### Commit Message 格式
+
+使用 Conventional Commits：
+
+| 类型 | 说明 |
+|------|------|
+| `feat` | 新功能 |
+| `fix` | 修复 bug |
+| `docs` | 文档变更 |
+| `style` | 代码格式（不影响运行） |
+| `refactor` | 重构 |
+| `perf` | 性能优化 |
+| `test` | 测试相关 |
+| `chore` | 构建/工具变动 |
+| `ci` | CI 配置变更 |
+| `revert` | 回滚 |
+
+### 操作规范
+
+- **只 commit，不 push** — 用户审查后再决定是否推送
+- 修改代码后运行 `flutter analyze` 验证
