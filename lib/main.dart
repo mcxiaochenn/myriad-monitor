@@ -1,9 +1,12 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:hive_flutter/hive_flutter.dart';
 import 'features/home/home_page.dart';
 import 'features/settings/settings_page.dart';
 import 'features/about/about_page.dart';
+import 'l10n/app_localizations.dart';
+import 'l10n/locale_provider.dart';
 
 /// 应用程序入口
 Future<void> main() async {
@@ -25,11 +28,13 @@ Future<void> main() async {
 final currentPageIndexProvider = StateProvider<int>((ref) => 0);
 
 /// 应用根组件
-class MyApp extends StatelessWidget {
+class MyApp extends ConsumerWidget {
   const MyApp({super.key});
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    final locale = ref.watch(localeProvider);
+
     return MaterialApp(
       title: 'Myriad Monitor',
       // 暗色主题配置
@@ -46,6 +51,15 @@ class MyApp extends StatelessWidget {
       ),
       // 跟随系统主题
       themeMode: ThemeMode.system,
+      // 国际化配置
+      locale: locale,
+      localizationsDelegates: const [
+        AppLocalizations.delegate,
+        GlobalMaterialLocalizations.delegate,
+        GlobalWidgetsLocalizations.delegate,
+        GlobalCupertinoLocalizations.delegate,
+      ],
+      supportedLocales: AppLocalizations.supportedLocales,
       home: const MainPage(),
     );
   }
@@ -60,6 +74,7 @@ class MainPage extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final currentIndex = ref.watch(currentPageIndexProvider);
+    final l10n = AppLocalizations.of(context);
 
     // 页面列表
     final pages = [
@@ -78,21 +93,21 @@ class MainPage extends ConsumerWidget {
         onDestinationSelected: (index) {
           ref.read(currentPageIndexProvider.notifier).state = index;
         },
-        destinations: const [
+        destinations: [
           NavigationDestination(
-            icon: Icon(Icons.home_outlined),
-            selectedIcon: Icon(Icons.home),
-            label: '主页',
+            icon: const Icon(Icons.home_outlined),
+            selectedIcon: const Icon(Icons.home),
+            label: l10n.navHome,
           ),
           NavigationDestination(
-            icon: Icon(Icons.settings_outlined),
-            selectedIcon: Icon(Icons.settings),
-            label: '配置',
+            icon: const Icon(Icons.settings_outlined),
+            selectedIcon: const Icon(Icons.settings),
+            label: l10n.navSettings,
           ),
           NavigationDestination(
-            icon: Icon(Icons.info_outline),
-            selectedIcon: Icon(Icons.info),
-            label: '关于',
+            icon: const Icon(Icons.info_outline),
+            selectedIcon: const Icon(Icons.info),
+            label: l10n.navAbout,
           ),
         ],
       ),

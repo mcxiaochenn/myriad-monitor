@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../../l10n/app_localizations.dart';
+import '../../l10n/locale_provider.dart';
 
 /// 服务器配置 Provider
 final serverConfigProvider = StateProvider<ServerConfig>((ref) {
@@ -43,25 +45,34 @@ class ServerConfig {
 /// - 数据推送间隔
 /// - 设备发现开关
 /// - 设备名称设置
+/// - 语言切换
 class SettingsPage extends ConsumerWidget {
   const SettingsPage({super.key});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final config = ref.watch(serverConfigProvider);
+    final l10n = AppLocalizations.of(context);
+    final languageMode = ref.watch(languageModeProvider);
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('配置'),
+        title: Text(l10n.navSettings),
         centerTitle: true,
       ),
       body: ListView(
         children: [
+          // 语言配置区域
+          _buildSectionHeader(context, l10n.language),
+          _buildLanguageSelector(context, ref, l10n, languageMode),
+
+          const Divider(),
+
           // 服务器配置区域
-          _buildSectionHeader(context, '服务器配置'),
+          _buildSectionHeader(context, l10n.serverConfig),
           SwitchListTile(
-            title: const Text('自动启动服务器'),
-            subtitle: const Text('应用启动时自动开启 WebSocket 服务器'),
+            title: Text(l10n.autoStartServer),
+            subtitle: Text(l10n.autoStartServerDesc),
             value: config.autoStart,
             onChanged: (value) {
               ref.read(serverConfigProvider.notifier).state = ServerConfig(
@@ -75,31 +86,31 @@ class SettingsPage extends ConsumerWidget {
             },
           ),
           ListTile(
-            title: const Text('服务器端口'),
+            title: Text(l10n.serverPort),
             subtitle: Text('${config.port}'),
             trailing: const Icon(Icons.chevron_right),
-            onTap: () => _editPort(context, ref, config),
+            onTap: () => _editPort(context, ref, config, l10n),
           ),
           ListTile(
-            title: const Text('监听地址'),
+            title: Text(l10n.listenAddress),
             subtitle: Text(config.address),
             trailing: const Icon(Icons.chevron_right),
-            onTap: () => _editAddress(context, ref, config),
+            onTap: () => _editAddress(context, ref, config, l10n),
           ),
           ListTile(
-            title: const Text('数据推送间隔'),
-            subtitle: Text('${config.pushInterval} 秒'),
+            title: Text(l10n.pushInterval),
+            subtitle: Text(l10n.seconds(config.pushInterval)),
             trailing: const Icon(Icons.chevron_right),
-            onTap: () => _editPushInterval(context, ref, config),
+            onTap: () => _editPushInterval(context, ref, config, l10n),
           ),
 
           const Divider(),
 
           // 设备发现配置区域
-          _buildSectionHeader(context, '设备发现'),
+          _buildSectionHeader(context, l10n.deviceDiscovery),
           SwitchListTile(
-            title: const Text('启用设备发现'),
-            subtitle: const Text('自动发现局域网内的其他 Myriad 设备'),
+            title: Text(l10n.enableDiscovery),
+            subtitle: Text(l10n.enableDiscoveryDesc),
             value: config.enableDiscovery,
             onChanged: (value) {
               ref.read(serverConfigProvider.notifier).state = ServerConfig(
@@ -113,30 +124,78 @@ class SettingsPage extends ConsumerWidget {
             },
           ),
           ListTile(
-            title: const Text('设备名称'),
+            title: Text(l10n.deviceNameLabel),
             subtitle: Text(config.deviceName),
             trailing: const Icon(Icons.chevron_right),
-            onTap: () => _editDeviceName(context, ref, config),
+            onTap: () => _editDeviceName(context, ref, config, l10n),
           ),
 
           const Divider(),
 
           // 数据存储配置区域
-          _buildSectionHeader(context, '数据存储'),
+          _buildSectionHeader(context, l10n.dataStorage),
           ListTile(
-            title: const Text('清除设备数据'),
-            subtitle: const Text('删除所有已保存的设备信息'),
+            title: Text(l10n.clearDeviceData),
+            subtitle: Text(l10n.clearDeviceDataDesc),
             trailing: const Icon(Icons.delete_outline),
-            onTap: () => _confirmClearData(context),
+            onTap: () => _confirmClearData(context, l10n),
           ),
           ListTile(
-            title: const Text('清除历史数据'),
-            subtitle: const Text('删除所有监控历史记录'),
+            title: Text(l10n.clearHistoryData),
+            subtitle: Text(l10n.clearHistoryDataDesc),
             trailing: const Icon(Icons.delete_outline),
-            onTap: () => _confirmClearHistory(context),
+            onTap: () => _confirmClearHistory(context, l10n),
           ),
         ],
       ),
+    );
+  }
+
+  /// 构建语言选择器
+  Widget _buildLanguageSelector(
+    BuildContext context,
+    WidgetRef ref,
+    AppLocalizations l10n,
+    LanguageMode currentMode,
+  ) {
+    return Column(
+      children: [
+        RadioListTile<LanguageMode>(
+          title: Text(l10n.systemDefault),
+          value: LanguageMode.system,
+          groupValue: currentMode,
+          onChanged: (value) {
+            if (value != null) {
+              ref.read(languageModeProvider.notifier).setLanguageMode(value);
+              ref.read(localeProvider.notifier).setLocale(null);
+            }
+          },
+        ),
+        RadioListTile<LanguageMode>(
+          title: Text(l10n.chinese),
+          subtitle: const Text('中文'),
+          value: LanguageMode.chinese,
+          groupValue: currentMode,
+          onChanged: (value) {
+            if (value != null) {
+              ref.read(languageModeProvider.notifier).setLanguageMode(value);
+              ref.read(localeProvider.notifier).setLocale(const Locale('zh', 'CN'));
+            }
+          },
+        ),
+        RadioListTile<LanguageMode>(
+          title: Text(l10n.english),
+          subtitle: const Text('English'),
+          value: LanguageMode.english,
+          groupValue: currentMode,
+          onChanged: (value) {
+            if (value != null) {
+              ref.read(languageModeProvider.notifier).setLanguageMode(value);
+              ref.read(localeProvider.notifier).setLocale(const Locale('en', 'US'));
+            }
+          },
+        ),
+      ],
     );
   }
 
@@ -155,23 +214,24 @@ class SettingsPage extends ConsumerWidget {
   }
 
   /// 编辑端口
-  void _editPort(BuildContext context, WidgetRef ref, ServerConfig config) {
+  void _editPort(BuildContext context, WidgetRef ref, ServerConfig config,
+      AppLocalizations l10n) {
     final controller = TextEditingController(text: '${config.port}');
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text('服务器端口'),
+        title: Text(l10n.editPortTitle),
         content: TextField(
           controller: controller,
           keyboardType: TextInputType.number,
-          decoration: const InputDecoration(
-            hintText: '输入端口号 (1-65535)',
+          decoration: InputDecoration(
+            hintText: l10n.editPortHint,
           ),
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context),
-            child: const Text('取消'),
+            child: Text(l10n.cancel),
           ),
           FilledButton(
             onPressed: () {
@@ -188,7 +248,7 @@ class SettingsPage extends ConsumerWidget {
                 Navigator.pop(context);
               }
             },
-            child: const Text('保存'),
+            child: Text(l10n.save),
           ),
         ],
       ),
@@ -196,22 +256,23 @@ class SettingsPage extends ConsumerWidget {
   }
 
   /// 编辑监听地址
-  void _editAddress(BuildContext context, WidgetRef ref, ServerConfig config) {
+  void _editAddress(BuildContext context, WidgetRef ref, ServerConfig config,
+      AppLocalizations l10n) {
     final controller = TextEditingController(text: config.address);
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text('监听地址'),
+        title: Text(l10n.editAddressTitle),
         content: TextField(
           controller: controller,
-          decoration: const InputDecoration(
-            hintText: '输入监听地址 (例如: 0.0.0.0)',
+          decoration: InputDecoration(
+            hintText: l10n.editAddressHint,
           ),
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context),
-            child: const Text('取消'),
+            child: Text(l10n.cancel),
           ),
           FilledButton(
             onPressed: () {
@@ -225,7 +286,7 @@ class SettingsPage extends ConsumerWidget {
               );
               Navigator.pop(context);
             },
-            child: const Text('保存'),
+            child: Text(l10n.save),
           ),
         ],
       ),
@@ -233,25 +294,24 @@ class SettingsPage extends ConsumerWidget {
   }
 
   /// 编辑推送间隔
-  void _editPushInterval(
-      BuildContext context, WidgetRef ref, ServerConfig config) {
-    final controller =
-        TextEditingController(text: '${config.pushInterval}');
+  void _editPushInterval(BuildContext context, WidgetRef ref,
+      ServerConfig config, AppLocalizations l10n) {
+    final controller = TextEditingController(text: '${config.pushInterval}');
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text('数据推送间隔'),
+        title: Text(l10n.editIntervalTitle),
         content: TextField(
           controller: controller,
           keyboardType: TextInputType.number,
-          decoration: const InputDecoration(
-            hintText: '输入间隔秒数 (1-60)',
+          decoration: InputDecoration(
+            hintText: l10n.editIntervalHint,
           ),
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context),
-            child: const Text('取消'),
+            child: Text(l10n.cancel),
           ),
           FilledButton(
             onPressed: () {
@@ -268,7 +328,7 @@ class SettingsPage extends ConsumerWidget {
                 Navigator.pop(context);
               }
             },
-            child: const Text('保存'),
+            child: Text(l10n.save),
           ),
         ],
       ),
@@ -276,23 +336,23 @@ class SettingsPage extends ConsumerWidget {
   }
 
   /// 编辑设备名称
-  void _editDeviceName(
-      BuildContext context, WidgetRef ref, ServerConfig config) {
+  void _editDeviceName(BuildContext context, WidgetRef ref,
+      ServerConfig config, AppLocalizations l10n) {
     final controller = TextEditingController(text: config.deviceName);
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text('设备名称'),
+        title: Text(l10n.editDeviceNameTitle),
         content: TextField(
           controller: controller,
-          decoration: const InputDecoration(
-            hintText: '输入设备名称',
+          decoration: InputDecoration(
+            hintText: l10n.editDeviceNameHint,
           ),
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context),
-            child: const Text('取消'),
+            child: Text(l10n.cancel),
           ),
           FilledButton(
             onPressed: () {
@@ -306,7 +366,7 @@ class SettingsPage extends ConsumerWidget {
               );
               Navigator.pop(context);
             },
-            child: const Text('保存'),
+            child: Text(l10n.save),
           ),
         ],
       ),
@@ -314,24 +374,24 @@ class SettingsPage extends ConsumerWidget {
   }
 
   /// 确认清除设备数据
-  void _confirmClearData(BuildContext context) {
+  void _confirmClearData(BuildContext context, AppLocalizations l10n) {
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text('清除设备数据'),
-        content: const Text('确定要删除所有已保存的设备信息吗？此操作不可撤销。'),
+        title: Text(l10n.clearDeviceData),
+        content: Text(l10n.confirmClearData),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context),
-            child: const Text('取消'),
+            child: Text(l10n.cancel),
           ),
           FilledButton(
             onPressed: () {
               // TODO: 实现清除设备数据
               Navigator.pop(context);
               ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(
-                  content: Text('设备数据已清除'),
+                SnackBar(
+                  content: Text(l10n.deviceDataCleared),
                   behavior: SnackBarBehavior.floating,
                 ),
               );
@@ -339,7 +399,7 @@ class SettingsPage extends ConsumerWidget {
             style: FilledButton.styleFrom(
               backgroundColor: Theme.of(context).colorScheme.error,
             ),
-            child: const Text('清除'),
+            child: Text(l10n.delete),
           ),
         ],
       ),
@@ -347,24 +407,24 @@ class SettingsPage extends ConsumerWidget {
   }
 
   /// 确认清除历史数据
-  void _confirmClearHistory(BuildContext context) {
+  void _confirmClearHistory(BuildContext context, AppLocalizations l10n) {
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text('清除历史数据'),
-        content: const Text('确定要删除所有监控历史记录吗？此操作不可撤销。'),
+        title: Text(l10n.clearHistoryData),
+        content: Text(l10n.confirmClearHistory),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context),
-            child: const Text('取消'),
+            child: Text(l10n.cancel),
           ),
           FilledButton(
             onPressed: () {
               // TODO: 实现清除历史数据
               Navigator.pop(context);
               ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(
-                  content: Text('历史数据已清除'),
+                SnackBar(
+                  content: Text(l10n.historyDataCleared),
                   behavior: SnackBarBehavior.floating,
                 ),
               );
@@ -372,7 +432,7 @@ class SettingsPage extends ConsumerWidget {
             style: FilledButton.styleFrom(
               backgroundColor: Theme.of(context).colorScheme.error,
             ),
-            child: const Text('清除'),
+            child: Text(l10n.delete),
           ),
         ],
       ),

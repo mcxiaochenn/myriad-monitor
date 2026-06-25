@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../l10n/app_localizations.dart';
 
 /// 关于页面
 ///
@@ -10,10 +11,11 @@ class AboutPage extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
+    final l10n = AppLocalizations.of(context);
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('关于'),
+        title: Text(l10n.navAbout),
         centerTitle: true,
       ),
       body: ListView(
@@ -40,7 +42,7 @@ class AboutPage extends StatelessWidget {
                 const SizedBox(height: 16),
                 // 应用名称
                 Text(
-                  '万镜 Myriad',
+                  l10n.appName,
                   style: theme.textTheme.headlineSmall?.copyWith(
                     fontWeight: FontWeight.bold,
                   ),
@@ -48,7 +50,7 @@ class AboutPage extends StatelessWidget {
                 const SizedBox(height: 4),
                 // 版本号
                 Text(
-                  '版本 1.0.0',
+                  'v1.0.0',
                   style: theme.textTheme.bodyMedium?.copyWith(
                     color: colorScheme.onSurfaceVariant,
                   ),
@@ -58,7 +60,7 @@ class AboutPage extends StatelessWidget {
                 Padding(
                   padding: const EdgeInsets.symmetric(horizontal: 40),
                   child: Text(
-                    '去中心化的跨平台系统监控面板\n设备间 IP 直连，一端采集一端渲染',
+                    l10n.appDescription,
                     textAlign: TextAlign.center,
                     style: theme.textTheme.bodySmall?.copyWith(
                       color: colorScheme.onSurfaceVariant,
@@ -72,46 +74,46 @@ class AboutPage extends StatelessWidget {
           const Divider(),
 
           // 功能特性
-          _buildSectionHeader(context, '功能特性'),
+          _buildSectionHeader(context, l10n.features),
           _buildFeatureItem(
             context,
             Icons.link,
-            '去中心化',
-            '无中心服务器，设备间通过 IP 直连通信',
+            l10n.decentralized,
+            l10n.decentralizedDesc,
           ),
           _buildFeatureItem(
             context,
             Icons.swap_horiz,
-            '客户端服务端同体',
-            '每个实例既是 Server 又是 Client',
+            l10n.clientServer,
+            l10n.clientServerDesc,
           ),
           _buildFeatureItem(
             context,
             Icons.devices,
-            '跨平台',
-            '支持 Windows、macOS、Linux、Android、iOS',
+            l10n.crossPlatform,
+            l10n.crossPlatformDesc,
           ),
           _buildFeatureItem(
             context,
             Icons.show_chart,
-            '实时监控',
-            'CPU、内存、GPU、磁盘、网络实时图表',
+            l10n.realtimeMonitor,
+            l10n.realtimeMonitorDesc,
           ),
 
           const Divider(),
 
           // 技术栈
-          _buildSectionHeader(context, '技术栈'),
-          _buildTechItem(context, 'Flutter', '跨平台 UI 框架'),
-          _buildTechItem(context, 'Riverpod', '状态管理'),
-          _buildTechItem(context, 'WebSocket', '设备间通信'),
-          _buildTechItem(context, 'fl_chart', '图表渲染'),
-          _buildTechItem(context, 'Hive', '本地数据存储'),
+          _buildSectionHeader(context, l10n.techStack),
+          _buildTechItem(context, 'Flutter', l10n.crossPlatformFramework),
+          _buildTechItem(context, 'Riverpod', l10n.stateManagement),
+          _buildTechItem(context, 'WebSocket', l10n.deviceCommunication),
+          _buildTechItem(context, 'fl_chart', l10n.chartRendering),
+          _buildTechItem(context, 'Hive', l10n.localStorage),
 
           const Divider(),
 
           // 开发者信息
-          _buildSectionHeader(context, '开发者'),
+          _buildSectionHeader(context, l10n.developer),
           ListTile(
             leading: CircleAvatar(
               backgroundColor: colorScheme.primaryContainer,
@@ -141,14 +143,11 @@ class AboutPage extends StatelessWidget {
           const Divider(),
 
           // 开源许可
-          _buildSectionHeader(context, '开源许可'),
-          ListTile(
-            title: const Text('MIT License'),
-            subtitle: const Text('Copyright (c) 2026 尘渊尘'),
-            trailing: const Icon(Icons.chevron_right),
-            onTap: () {
-              // TODO: 显示完整许可证
-            },
+          _buildSectionHeader(context, l10n.openSourceLicense),
+          const ListTile(
+            title: Text('MIT License'),
+            subtitle: Text('Copyright (c) 2026 辰渊尘'),
+            trailing: Icon(Icons.chevron_right),
           ),
 
           const SizedBox(height: 40),
