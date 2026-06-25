@@ -1,16 +1,15 @@
 import 'package:flutter/material.dart';
-import '../../core/models/device_info.dart';
+import '../../client/device_manager.dart';
 
 /// 设备卡片组件
 ///
-/// 展示单个设备的基本信息，包括设备名称、操作系统、IP 地址，
+/// 展示单个设备的基本信息，包括设备名称、IP 地址，
 /// 以及右上角的状态指示灯（在线/离线）。
 ///
-/// 使用 [Card] 组件并预留高斯模糊背景位置（通过 [ClipRRect] + [BackdropFilter]）。
-/// 点击卡片时通过 [onTap] 回调通知父组件导航。
+/// 使用 [Card] 组件，点击卡片时通过 [onTap] 回调通知父组件导航。
 class DeviceCard extends StatelessWidget {
   /// 要展示的设备信息
-  final DeviceInfo device;
+  final ManagedDevice device;
 
   /// 点击卡片时的回调
   final VoidCallback? onTap;
@@ -27,7 +26,6 @@ class DeviceCard extends StatelessWidget {
     final colorScheme = theme.colorScheme;
 
     return Card(
-      // 预留高斯模糊背景：实际背景图由父组件或后续状态数据提供
       clipBehavior: Clip.antiAlias,
       elevation: 2,
       margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
@@ -37,7 +35,6 @@ class DeviceCard extends StatelessWidget {
       child: InkWell(
         onTap: onTap,
         borderRadius: BorderRadius.circular(16),
-        // 高斯模糊背景层 —— 当前使用纯色占位，后续可替换为设备截图或渐变
         child: Container(
           decoration: BoxDecoration(
             gradient: LinearGradient(
@@ -78,28 +75,32 @@ class DeviceCard extends StatelessWidget {
         borderRadius: BorderRadius.circular(12),
       ),
       child: Icon(
-        _getOsIcon(),
+        _getDeviceIcon(),
         size: 28,
         color: colorScheme.onPrimaryContainer,
       ),
     );
   }
 
-  /// 根据操作系统类型返回对应图标
-  IconData _getOsIcon() {
-    switch (device.osType) {
-      case DeviceOsType.windows:
-        return Icons.computer;
-      case DeviceOsType.macos:
-        return Icons.laptop_mac;
-      case DeviceOsType.linux:
-        return Icons.terminal;
-      case DeviceOsType.unknown:
-        return Icons.devices_other;
+  /// 根据设备名称或 IP 返回对应图标
+  IconData _getDeviceIcon() {
+    // 根据设备名称推断类型
+    final name = device.name.toLowerCase();
+    if (name.contains('server') || name.contains('服务器')) {
+      return Icons.dns;
+    } else if (name.contains('laptop') || name.contains('笔记本')) {
+      return Icons.laptop;
+    } else if (name.contains('desktop') || name.contains('台式机')) {
+      return Icons.desktop_windows;
+    } else if (name.contains('phone') || name.contains('手机')) {
+      return Icons.phone_android;
+    } else if (name.contains('tablet') || name.contains('平板')) {
+      return Icons.tablet;
     }
+    return Icons.computer;
   }
 
-  /// 构建设备信息区域（名称、操作系统、IP）
+  /// 构建设备信息区域（名称、IP、最后在线时间）
   Widget _buildDeviceInfo(ThemeData theme) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -115,28 +116,45 @@ class DeviceCard extends StatelessWidget {
           overflow: TextOverflow.ellipsis,
         ),
         const SizedBox(height: 4),
-        // 操作系统
-        Text(
-          device.osType.displayName,
-          style: theme.textTheme.bodySmall?.copyWith(
-            color: theme.colorScheme.onSurfaceVariant,
-          ),
-          maxLines: 1,
-          overflow: TextOverflow.ellipsis,
-        ),
-        const SizedBox(height: 2),
         // IP 地址
         Text(
           device.ipAddress,
           style: theme.textTheme.bodySmall?.copyWith(
-            color: theme.colorScheme.onSurfaceVariant.withValues(alpha: 0.7),
+            color: theme.colorScheme.onSurfaceVariant,
             fontFamily: 'monospace',
           ),
           maxLines: 1,
           overflow: TextOverflow.ellipsis,
         ),
+        const SizedBox(height: 2),
+        // 最后在线时间
+        if (device.lastSeenAt != null)
+          Text(
+            '最后在线: ${_formatLastSeen(device.lastSeenAt!)}',
+            style: theme.textTheme.bodySmall?.copyWith(
+              color: theme.colorScheme.onSurfaceVariant.withValues(alpha: 0.7),
+            ),
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+          ),
       ],
     );
+  }
+
+  /// 格式化最后在线时间
+  String _formatLastSeen(DateTime lastSeen) {
+    final now = DateTime.now();
+    final diff = now.difference(lastSeen);
+
+    if (diff.inSeconds < 60) {
+      return '${diff.inSeconds}秒前';
+    } else if (diff.inMinutes < 60) {
+      return '${diff.inMinutes}分钟前';
+    } else if (diff.inHours < 24) {
+      return '${diff.inHours}小时前';
+    } else {
+      return '${diff.inDays}天前';
+    }
   }
 
   /// 构建状态指示灯
@@ -172,7 +190,7 @@ class DeviceCard extends StatelessWidget {
         const SizedBox(height: 4),
         // 状态文字
         Text(
-          device.status.displayName,
+          isOnline ? '在线' : '离线',
           style: TextStyle(
             fontSize: 11,
             color: dotColor,

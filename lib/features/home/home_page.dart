@@ -1,47 +1,24 @@
 import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import '../../core/models/device_info.dart';
+import '../../client/device_manager.dart';
+import '../../client/client_service.dart';
 import 'device_card.dart';
 
-/// 模拟设备数据 Provider（后续替换为真实数据源）
-///
-/// 返回一份示例设备列表，用于开发和调试阶段。
-final deviceListProvider = Provider<List<DeviceInfo>>((ref) {
-  return [
-    const DeviceInfo(
-      id: '1',
-      name: '我的笔记本',
-      ipAddress: '192.168.1.100',
-      osType: DeviceOsType.windows,
-      osVersion: '11',
-      status: DeviceStatus.online,
-    ),
-    const DeviceInfo(
-      id: '2',
-      name: 'Mac Studio',
-      ipAddress: '192.168.1.101',
-      osType: DeviceOsType.macos,
-      osVersion: '14',
-      status: DeviceStatus.online,
-    ),
-    const DeviceInfo(
-      id: '3',
-      name: 'Ubuntu 服务器',
-      ipAddress: '192.168.1.200',
-      osType: DeviceOsType.linux,
-      osVersion: '22.04',
-      status: DeviceStatus.offline,
-    ),
-    const DeviceInfo(
-      id: '4',
-      name: '开发用树莓派',
-      ipAddress: '192.168.1.50',
-      osType: DeviceOsType.linux,
-      osVersion: 'Debian 12',
-      status: DeviceStatus.online,
-    ),
-  ];
+/// 设备管理器 Provider
+final deviceManagerProvider = Provider<DeviceManager>((ref) {
+  final manager = DeviceManager();
+  // 启动离线检测
+  manager.startOfflineDetection();
+  // 释放时停止检测
+  ref.onDispose(() => manager.dispose());
+  return manager;
+});
+
+/// 设备列表 Provider
+final deviceListProvider = Provider<List<ManagedDevice>>((ref) {
+  final manager = ref.watch(deviceManagerProvider);
+  return manager.devices;
 });
 
 /// 设备列表主页
@@ -82,8 +59,7 @@ class HomePage extends ConsumerWidget {
       ),
       body: Stack(
         children: [
-          // 高斯模糊背景层（预留位置）
-          // 后续可替换为实时壁纸、渐变动画或设备截图拼贴
+          // 高斯模糊背景
           _buildBlurredBackground(context),
 
           // 设备列表
@@ -94,9 +70,8 @@ class HomePage extends ConsumerWidget {
   }
 
   /// 构建高斯模糊背景
-  ///
-  /// 使用 BackdropFilter 实现高斯模糊效果，配合从主题色到背景色的渐变。
   Widget _buildBlurredBackground(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
     return ClipRect(
       child: BackdropFilter(
         filter: ImageFilter.blur(sigmaX: 20, sigmaY: 20),
@@ -106,8 +81,8 @@ class HomePage extends ConsumerWidget {
               begin: Alignment.topCenter,
               end: Alignment.bottomCenter,
               colors: [
-                Theme.of(context).colorScheme.primary.withOpacity(0.1),
-                Theme.of(context).colorScheme.surface,
+                colorScheme.primary.withValues(alpha: 0.1),
+                colorScheme.surface,
               ],
             ),
           ),
@@ -117,7 +92,7 @@ class HomePage extends ConsumerWidget {
   }
 
   /// 构建设备列表主体
-  Widget _buildDeviceList(BuildContext context, List<DeviceInfo> devices) {
+  Widget _buildDeviceList(BuildContext context, List<ManagedDevice> devices) {
     if (devices.isEmpty) {
       return _buildEmptyState(context);
     }
@@ -218,9 +193,7 @@ class HomePage extends ConsumerWidget {
   }
 
   /// 导航到设备详情页
-  ///
-  /// 当前使用 SnackBar 作为占位提示，待详情页实现后替换为 Navigator.push。
-  void _navigateToDetail(BuildContext context, DeviceInfo device) {
+  void _navigateToDetail(BuildContext context, ManagedDevice device) {
     // TODO: 替换为真实的详情页路由
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
