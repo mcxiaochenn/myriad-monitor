@@ -13,6 +13,12 @@ dependencies:
   # 系统信息获取
   system_info2: ^4.0.0
 
+  # Windows API 绑定
+  win32: ^5.0.0
+
+  # FFI 工具
+  ffi: ^2.0.0
+
   # WebSocket 通信
   web_socket_channel: ^2.4.0
 
@@ -27,9 +33,16 @@ dependencies:
 
   # 本地数据存储
   hive: ^2.2.3
+  hive_flutter: ^1.1.0
 
   # 偏好设置存储
   shared_preferences: ^2.2.0
+
+  # 路径获取
+  path_provider: ^2.1.0
+
+  # UUID 生成
+  uuid: ^4.0.0
 
   # 状态管理
   flutter_riverpod: ^2.4.0
