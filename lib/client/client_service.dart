@@ -265,7 +265,7 @@ class ClientService {
 
       switch (type) {
         case 'systemInfo':
-          final info = SystemInfoData.fromJson(json['payload'] as Map<String, dynamic>);
+          final info = SystemInfoData.fromJson(json['data'] as Map<String, dynamic>);
           _dataController.add(info);
           break;
 
