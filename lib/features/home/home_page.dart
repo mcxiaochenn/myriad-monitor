@@ -1,3 +1,4 @@
+import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../core/models/device_info.dart';
@@ -94,25 +95,24 @@ class HomePage extends ConsumerWidget {
 
   /// 构建高斯模糊背景
   ///
-  /// 当前使用简单渐变占位，后续可接入设备截图或动态背景。
+  /// 使用 BackdropFilter 实现高斯模糊效果，配合从主题色到背景色的渐变。
   Widget _buildBlurredBackground(BuildContext context) {
-    final colorScheme = Theme.of(context).colorScheme;
-    return Container(
-      decoration: BoxDecoration(
-        gradient: LinearGradient(
-          begin: Alignment.topCenter,
-          end: Alignment.bottomCenter,
-          colors: [
-            colorScheme.surface,
-            colorScheme.surfaceContainerLow,
-          ],
+    return ClipRect(
+      child: BackdropFilter(
+        filter: ImageFilter.blur(sigmaX: 20, sigmaY: 20),
+        child: Container(
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              begin: Alignment.topCenter,
+              end: Alignment.bottomCenter,
+              colors: [
+                Theme.of(context).colorScheme.primary.withOpacity(0.1),
+                Theme.of(context).colorScheme.surface,
+              ],
+            ),
+          ),
         ),
       ),
-      // 预留 BackdropFilter 高斯模糊位置
-      // child: BackdropFilter(
-      //   filter: ImageFilter.blur(sigmaX: 20, sigmaY: 20),
-      //   child: Container(color: Colors.transparent),
-      // ),
     );
   }
 
