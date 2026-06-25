@@ -18,6 +18,9 @@ jobs:
         with:
           channel: stable
 
+      # 生成平台目录（windows/, android/ 等）
+      - run: flutter create --project-name myriad_monitor --platforms windows .
+
       - run: flutter pub get
 
       - run: flutter build windows --release
@@ -41,6 +44,9 @@ jobs:
       - uses: subosito/flutter-action@v2
         with:
           channel: stable
+
+      # 生成平台目录（android/, ios/ 等）
+      - run: flutter create --project-name myriad_monitor --platforms android .
 
       - run: flutter pub get
 
