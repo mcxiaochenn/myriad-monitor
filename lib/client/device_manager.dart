@@ -19,7 +19,7 @@ enum DeviceOnlineStatus {
 /// 已发现设备信息
 ///
 /// 存储单台远程设备的基本信息与实时状态。
-class DeviceInfo {
+class ManagedDevice {
   /// 设备唯一标识
   final String deviceId;
 
@@ -47,7 +47,7 @@ class DeviceInfo {
   /// 备注信息
   String? remark;
 
-  DeviceInfo({
+  ManagedDevice({
     required this.deviceId,
     required this.name,
     required this.ipAddress,
@@ -80,8 +80,8 @@ class DeviceInfo {
   }
 
   /// 从 JSON 映射构造实例
-  factory DeviceInfo.fromJson(Map<String, dynamic> json) {
-    return DeviceInfo(
+  factory ManagedDevice.fromJson(Map<String, dynamic> json) {
+    return ManagedDevice(
       deviceId: json['deviceId'] as String,
       name: json['name'] as String,
       ipAddress: json['ipAddress'] as String,
@@ -106,14 +106,14 @@ class DeviceInfo {
 /// - 设备在线状态跟踪
 /// - 设备列表变化通知
 class DeviceManager {
-  /// 已注册设备映射表（deviceId -> DeviceInfo）
-  final Map<String, DeviceInfo> _devices = {};
+  /// 已注册设备映射表（deviceId -> ManagedDevice）
+  final Map<String, ManagedDevice> _devices = {};
 
   /// 设备列表变化控制器
-  final _devicesChangedController = StreamController<List<DeviceInfo>>.broadcast();
+  final _devicesChangedController = StreamController<List<ManagedDevice>>.broadcast();
 
   /// 单设备状态变化控制器
-  final _deviceStatusController = StreamController<DeviceInfo>.broadcast();
+  final _deviceStatusController = StreamController<ManagedDevice>.broadcast();
 
   /// 离线检测定时器
   Timer? _offlineCheckTimer;
@@ -136,27 +136,27 @@ class DeviceManager {
   /// 设备列表变化流
   ///
   /// 当设备被添加、移除或列表发生任何变化时触发。
-  Stream<List<DeviceInfo>> get devicesChangedStream =>
+  Stream<List<ManagedDevice>> get devicesChangedStream =>
       _devicesChangedController.stream;
 
   /// 单设备状态变化流
   ///
   /// 当某台设备的在线状态或系统信息更新时触发。
-  Stream<DeviceInfo> get deviceStatusStream => _deviceStatusController.stream;
+  Stream<ManagedDevice> get deviceStatusStream => _deviceStatusController.stream;
 
   // ---------------------------------------------------------------------------
   // 设备列表访问
   // ---------------------------------------------------------------------------
 
   /// 获取所有已注册设备的不可变列表
-  List<DeviceInfo> get devices => List.unmodifiable(_devices.values);
+  List<ManagedDevice> get devices => List.unmodifiable(_devices.values);
 
   /// 获取所有在线设备
-  List<DeviceInfo> get onlineDevices =>
+  List<ManagedDevice> get onlineDevices =>
       _devices.values.where((d) => d.isOnline).toList();
 
   /// 获取所有离线设备
-  List<DeviceInfo> get offlineDevices =>
+  List<ManagedDevice> get offlineDevices =>
       _devices.values.where((d) => !d.isOnline).toList();
 
   /// 设备总数
@@ -166,7 +166,7 @@ class DeviceManager {
   int get onlineDeviceCount => onlineDevices.length;
 
   /// 根据 ID 获取设备信息，不存在时返回 null
-  DeviceInfo? getDevice(String deviceId) => _devices[deviceId];
+  ManagedDevice? getDevice(String deviceId) => _devices[deviceId];
 
   /// 是否存在指定 ID 的设备
   bool hasDevice(String deviceId) => _devices.containsKey(deviceId);
@@ -179,7 +179,7 @@ class DeviceManager {
   ///
   /// 如果已存在相同 [deviceId] 的设备，将被忽略并返回 false。
   /// 返回 true 表示添加成功。
-  bool addDevice(DeviceInfo device) {
+  bool addDevice(ManagedDevice device) {
     if (_devices.containsKey(device.deviceId)) {
       debugPrint('[DeviceManager] 设备已存在: ${device.deviceId}');
       return false;
@@ -210,7 +210,7 @@ class DeviceManager {
   ///
   /// 通过回调函数对已有设备信息进行原地修改。
   /// 设备不存在时返回 false。
-  bool updateDevice(String deviceId, void Function(DeviceInfo device) updater) {
+  bool updateDevice(String deviceId, void Function(ManagedDevice device) updater) {
     final device = _devices[deviceId];
     if (device == null) {
       debugPrint('[DeviceManager] 设备不存在，无法更新: $deviceId');
@@ -243,7 +243,7 @@ class DeviceManager {
 
     if (device == null) {
       // 自动注册新发现的设备
-      final newDevice = DeviceInfo(
+      final newDevice = ManagedDevice(
         deviceId: data.deviceId,
         name: data.deviceName,
         ipAddress: '', // IP 将在连接时确定
@@ -326,7 +326,7 @@ class DeviceManager {
   // ---------------------------------------------------------------------------
 
   /// 按名称搜索设备（模糊匹配，不区分大小写）
-  List<DeviceInfo> searchByName(String keyword) {
+  List<ManagedDevice> searchByName(String keyword) {
     final lowerKeyword = keyword.toLowerCase();
     return _devices.values
         .where((d) => d.name.toLowerCase().contains(lowerKeyword))
@@ -336,8 +336,8 @@ class DeviceManager {
   /// 获取设备列表的排序副本
   ///
   /// [compare] - 自定义比较函数，默认按名称字母顺序排列。
-  List<DeviceInfo> getSortedDevices({
-    int Function(DeviceInfo a, DeviceInfo b)? compare,
+  List<ManagedDevice> getSortedDevices({
+    int Function(ManagedDevice a, ManagedDevice b)? compare,
   }) {
     final list = devices;
     list.sort(compare ?? (a, b) => a.name.compareTo(b.name));
@@ -376,7 +376,7 @@ class DeviceManager {
   }
 
   /// 通知单台设备状态发生变化
-  void _notifyDeviceStatusChanged(DeviceInfo device) {
+  void _notifyDeviceStatusChanged(ManagedDevice device) {
     if (!_deviceStatusController.isClosed) {
       _deviceStatusController.add(device);
     }
