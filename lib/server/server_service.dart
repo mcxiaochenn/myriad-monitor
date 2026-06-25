@@ -1,6 +1,8 @@
 import 'dart:async';
 import 'dart:convert';
 
+import 'package:shelf/shelf.dart' as shelf;
+import 'package:shelf/shelf_io.dart' as shelf_io;
 import 'package:shelf_web_socket/shelf_web_socket.dart';
 import 'package:web_socket_channel/web_socket_channel.dart';
 
@@ -67,18 +69,17 @@ class ServerService {
     }
 
     try {
-      // TODO: 创建 WebSocket 处理器
-      // 处理客户端连接、断开、消息接收等事件
+      // 创建 WebSocket 处理器
       final handler = webSocketHandler((WebSocketChannel webSocket) {
         _onClientConnected(webSocket);
       });
 
-      // TODO: 使用 shelf 启动 HTTP 服务器
-      // _server = await shelf_io.serve(
-      //   handler,
-      //   address,
-      //   port,
-      // );
+      // 使用 shelf 启动 HTTP 服务器
+      _server = await shelf_io.serve(
+        handler,
+        address,
+        port,
+      );
 
       _isRunning = true;
 
@@ -113,7 +114,7 @@ class ServerService {
     _disconnectAllClients();
 
     // 关闭 HTTP 服务器
-    // await _server?.close(force: true);
+    await _server?.close(force: true);
     _server = null;
 
     _isRunning = false;
@@ -160,8 +161,6 @@ class ServerService {
   /// [webSocket] 发送消息的客户端
   /// [message] 接收到的消息内容
   void _onClientMessage(WebSocketChannel webSocket, dynamic message) {
-    // TODO: 解析并处理客户端请求
-    // 例如：订阅特定监控项、请求历史数据等
     try {
       final data = jsonDecode(message as String);
       final type = data['type'] as String?;
