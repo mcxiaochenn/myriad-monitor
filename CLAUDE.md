@@ -15,7 +15,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## 技术栈
 
-- **框架**: Flutter 3.x (桌面端: Windows / macOS / Linux)
+- **框架**: Flutter 3.x (全平台: Windows / macOS / Linux / Android / iOS)
 - **状态管理**: Riverpod
 - **系统信息采集**: `system_info2` / `dart:ffi`
 - **设备间通信**: WebSocket (`shelf` + `web_socket_channel`)
@@ -29,15 +29,19 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 # 安装依赖
 flutter pub get
 
-# 运行桌面应用
+# 运行应用
 flutter run -d windows    # Windows
 flutter run -d macos      # macOS
 flutter run -d linux      # Linux
+flutter run -d android    # Android
+flutter run -d ios        # iOS
 
 # 构建发布版
 flutter build windows
 flutter build macos
 flutter build linux
+flutter build apk         # Android APK
+flutter build ios         # iOS
 
 # 运行测试
 flutter test

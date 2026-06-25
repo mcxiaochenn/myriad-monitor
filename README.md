@@ -7,7 +7,7 @@
 <p align="left">
   <img src="https://img.shields.io/github/license/mcxiaochenn/myriad-monitor" alt="License">
   <img src="https://img.shields.io/badge/Flutter-3.x-blue" alt="Flutter">
-  <img src="https://img.shields.io/badge/Platform-Windows%20%7C%20macOS%20%7C%20Linux-lightgrey" alt="Platform">
+  <img src="https://img.shields.io/badge/Platform-Windows%20%7C%20macOS%20%7C%20Linux%20%7C%20Android%20%7C%20iOS-lightgrey" alt="Platform">
 </p>
 
 ## 核心特性
@@ -16,7 +16,7 @@
 |---|---|
 | **去中心化** | 无中心服务器，设备间通过 IP 直连通信 |
 | **客户端服务端同体** | 每个实例既是 Server（采集数据）又是 Client（展示数据） |
-| **跨平台** | Windows / macOS / Linux 桌面端，Flutter 一套代码 |
+| **跨平台** | Windows / macOS / Linux / Android / iOS，Flutter 一套代码 |
 | **实时监控** | CPU、内存、GPU、磁盘、网络等常见指标，实时图表渲染 |
 | **视觉体验** | 高斯模糊背景、连续曲率圆角、流畅动画 |
 
@@ -60,7 +60,7 @@
 
 | 层 | 方案 |
 |---|---|
-| **UI 框架** | Flutter 3.x (Desktop) |
+| **UI 框架** | Flutter 3.x |
 | **状态管理** | Riverpod |
 | **系统信息采集** | `system_info2` / `dart:ffi` 调用原生 API |
 | **设备间通信** | WebSocket (`shelf` + `web_socket_channel`) |
@@ -73,7 +73,8 @@
 **环境要求**
 - Flutter 3.x
 - Dart 3.x
-- Windows 10+ / macOS 10.15+ / Linux (X11/Wayland)
+- 桌面端: Windows 10+ / macOS 10.15+ / Linux (X11/Wayland)
+- 移动端: Android 6.0+ / iOS 12.0+
 
 **安装与运行**
 
@@ -81,13 +82,28 @@
 git clone https://github.com/mcxiaochenn/myriad-monitor.git
 cd myriad-monitor
 flutter pub get
-flutter run -d windows  # 或 macos / linux
+
+# 桌面端
+flutter run -d windows    # Windows
+flutter run -d macos      # macOS
+flutter run -d linux      # Linux
+
+# 移动端
+flutter run -d android    # Android
+flutter run -d ios        # iOS
 ```
 
 **构建发布版**
 
 ```bash
-flutter build windows  # 或 macos / linux
+# 桌面端
+flutter build windows
+flutter build macos
+flutter build linux
+
+# 移动端
+flutter build apk         # Android APK
+flutter build ios         # iOS
 ```
 
 ## Roadmap
