@@ -109,7 +109,7 @@ class RealtimeLineChart extends StatelessWidget {
         horizontalInterval: (maxY - minY) / 4,
         getDrawingHorizontalLine: (value) {
           return FlLine(
-            color: theme.colorScheme.outlineVariant.withOpacity(0.3),
+            color: theme.colorScheme.outlineVariant.withValues(alpha: 0.3),
             strokeWidth: 1,
             dashArray: [4, 4], // 虚线样式
           );
@@ -170,7 +170,7 @@ class RealtimeLineChart extends StatelessWidget {
       lineTouchData: LineTouchData(
         touchTooltipData: LineTouchTooltipData(
           getTooltipColor: (_) =>
-              theme.colorScheme.inverseSurface.withOpacity(0.85),
+              theme.colorScheme.inverseSurface.withValues(alpha: 0.85),
           getTooltipItems: (touchedSpots) {
             return touchedSpots.map((spot) {
               return LineTooltipItem(
@@ -203,8 +203,8 @@ class RealtimeLineChart extends StatelessWidget {
               begin: Alignment.topCenter,
               end: Alignment.bottomCenter,
               colors: [
-                lineColor.withOpacity(0.3),
-                lineColor.withOpacity(0.0),
+                lineColor.withValues(alpha: 0.3),
+                lineColor.withValues(alpha: 0.0),
               ],
             ),
           ),
@@ -291,8 +291,8 @@ class MiniLineChart extends StatelessWidget {
               begin: Alignment.topCenter,
               end: Alignment.bottomCenter,
               colors: [
-                lineColor.withOpacity(0.3),
-                lineColor.withOpacity(0.0),
+                lineColor.withValues(alpha: 0.3),
+                lineColor.withValues(alpha: 0.0),
               ],
             ),
           ),

@@ -188,7 +188,7 @@ class HomePage extends ConsumerWidget {
           Icon(
             Icons.devices_other,
             size: 64,
-            color: colorScheme.onSurfaceVariant.withOpacity(0.4),
+            color: colorScheme.onSurfaceVariant.withValues(alpha: 0.4),
           ),
           const SizedBox(height: 16),
           Text(
@@ -201,7 +201,7 @@ class HomePage extends ConsumerWidget {
           Text(
             '请确保其他设备在同一局域网内',
             style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                  color: colorScheme.onSurfaceVariant.withOpacity(0.7),
+                  color: colorScheme.onSurfaceVariant.withValues(alpha: 0.7),
                 ),
           ),
           const SizedBox(height: 24),

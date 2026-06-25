@@ -2,6 +2,7 @@
 ///
 /// 用于表示系统的各项性能指标，包括 CPU、内存、GPU、磁盘、网络等
 /// 支持 JSON 序列化和反序列化
+library;
 
 /// CPU 信息模型
 class CpuMetrics {

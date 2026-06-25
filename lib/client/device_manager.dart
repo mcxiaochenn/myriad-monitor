@@ -307,7 +307,7 @@ class DeviceManager {
   /// 检查并标记超时设备为离线
   void _checkOfflineDevices() {
     final now = DateTime.now();
-    final timeout = Duration(seconds: _offlineTimeoutSeconds);
+    const timeout = Duration(seconds: _offlineTimeoutSeconds);
 
     for (final device in _devices.values) {
       if (device.onlineStatus == DeviceOnlineStatus.online &&

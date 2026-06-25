@@ -45,7 +45,7 @@ class AppRouter {
 
       default:
         return _buildRoute(
-          _PlaceholderPage(title: '404 - 页面未找到'),
+          const _PlaceholderPage(title: '404 - 页面未找到'),
           settings,
         );
     }

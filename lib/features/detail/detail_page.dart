@@ -214,7 +214,7 @@ class DeviceDetailPage extends StatelessWidget {
   Widget _buildMemoryCard(ThemeData theme) {
     const usedGb = 8.2;
     const totalGb = 16.0;
-    final usage = usedGb / totalGb; // 使用比例
+    const usage = usedGb / totalGb; // 使用比例
 
     return Card(
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
@@ -346,7 +346,7 @@ class DeviceDetailPage extends StatelessWidget {
       padding: const EdgeInsets.all(12),
       margin: const EdgeInsets.symmetric(horizontal: 4),
       decoration: BoxDecoration(
-        color: theme.colorScheme.surfaceContainerHighest.withOpacity(0.4),
+        color: theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.4),
         borderRadius: BorderRadius.circular(12),
       ),
       child: Column(
@@ -383,9 +383,9 @@ class DeviceDetailPage extends StatelessWidget {
   Widget _buildDiskCard(ThemeData theme) {
     // 磁盘分区演示数据
     final partitions = [
-      _DiskPartition('C:', 'NTFS', 186.5, 237.0),
-      _DiskPartition('D:', 'NTFS', 412.3, 931.5),
-      _DiskPartition('E:', 'NTFS', 28.7, 100.0),
+      const _DiskPartition('C:', 'NTFS', 186.5, 237.0),
+      const _DiskPartition('D:', 'NTFS', 412.3, 931.5),
+      const _DiskPartition('E:', 'NTFS', 28.7, 100.0),
     ];
 
     return Card(

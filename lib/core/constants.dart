@@ -1,6 +1,7 @@
 /// 应用程序常量定义
 ///
 /// 集中管理所有配置常量，便于维护和修改
+library;
 
 /// 网络相关常量
 class NetworkConstants {

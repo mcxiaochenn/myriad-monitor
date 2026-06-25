@@ -129,7 +129,7 @@ class DeviceCard extends StatelessWidget {
         Text(
           device.ipAddress,
           style: theme.textTheme.bodySmall?.copyWith(
-            color: theme.colorScheme.onSurfaceVariant.withOpacity(0.7),
+            color: theme.colorScheme.onSurfaceVariant.withValues(alpha: 0.7),
             fontFamily: 'monospace',
           ),
           maxLines: 1,
@@ -161,7 +161,7 @@ class DeviceCard extends StatelessWidget {
             boxShadow: isOnline
                 ? [
                     BoxShadow(
-                      color: dotColor.withOpacity(0.6),
+                      color: dotColor.withValues(alpha: 0.6),
                       blurRadius: 8,
                       spreadRadius: 2,
                     ),
