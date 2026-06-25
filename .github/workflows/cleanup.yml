@@ -1,0 +1,187 @@
+name: Cleanup Workflows
+
+on:
+  workflow_dispatch:
+    inputs:
+      workflow:
+        description: '要清理的工作流名称 (留空则清理所有)'
+        required: false
+        default: ''
+      status:
+        description: '要删除的状态'
+        required: true
+        type: choice
+        options:
+          - 'all'        # 所有状态
+          - 'failure'    # 仅失败
+          - 'success'    # 仅成功
+          - 'cancelled'  # 仅取消
+          - 'skipped'    # 仅跳过
+        default: 'failure'
+      keep_recent:
+        description: '保留最近 N 个 runs (0 = 不保留)'
+        required: true
+        type: number
+        default: 5
+      days_old:
+        description: '删除超过 N 天的 runs (0 = 不限制天数)'
+        required: true
+        type: number
+        default: 30
+      dry_run:
+        description: '试运行 (仅显示将删除的 runs，不实际删除)'
+        required: true
+        type: boolean
+        default: true
+
+jobs:
+  cleanup:
+    name: Cleanup Workflow Runs
+    runs-on: ubuntu-latest
+    permissions:
+      actions: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Cleanup runs
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          WORKFLOW: ${{ inputs.workflow }}
+          STATUS: ${{ inputs.status }}
+          KEEP_RECENT: ${{ inputs.keep_recent }}
+          DAYS_OLD: ${{ inputs.days_old }}
+          DRY_RUN: ${{ inputs.dry_run }}
+        run: |
+          echo "=========================================="
+          echo "清理配置"
+          echo "=========================================="
+          echo "工作流: ${WORKFLOW:-所有工作流}"
+          echo "状态: $STATUS"
+          echo "保留最近: $KEEP_RECENT 个"
+          echo "删除超过: $DAYS_OLD 天"
+          echo "试运行: $DRY_RUN"
+          echo "=========================================="
+
+          # 获取仓库信息
+          REPO="${{ github.repository }}"
+
+          # 计算截止日期
+          if [ "$DAYS_OLD" -gt 0 ]; then
+            CUTOFF_DATE=$(date -d "-${DAYS_OLD} days" -u +%Y-%m-%dT%H:%M:%SZ)
+            echo "截止日期: $CUTOFF_DATE"
+          fi
+
+          # 获取 workflow runs
+          get_runs() {
+            local workflow_filter=""
+            if [ -n "$WORKFLOW" ]; then
+              # 根据工作流名称获取 ID
+              WORKFLOW_ID=$(gh api repos/$REPO/actions/workflows --jq ".workflows[] | select(.name == \"$WORKFLOW\") | .id")
+              if [ -z "$WORKFLOW_ID" ]; then
+                echo "错误: 找不到工作流 '$WORKFLOW'"
+                exit 1
+              fi
+              workflow_filter="/workflows/$WORKFLOW_ID"
+            fi
+
+            gh api "repos/$REPO/actions/runs${workflow_filter}" \
+              --jq '.workflow_runs[] | {id: .id, name: .name, status: .conclusion, created_at: .created_at, run_number: .run_number}' \
+              --paginate
+          }
+
+          # 获取所有 runs
+          echo "正在获取 workflow runs..."
+          ALL_RUNS=$(get_runs)
+
+          if [ -z "$ALL_RUNS" ]; then
+            echo "没有找到任何 workflow runs"
+            exit 0
+          fi
+
+          # 统计总数
+          TOTAL_COUNT=$(echo "$ALL_RUNS" | jq -s 'length')
+          echo "总共找到 $TOTAL_COUNT 个 runs"
+
+          # 过滤状态
+          if [ "$STATUS" != "all" ]; then
+            FILTERED_RUNS=$(echo "$ALL_RUNS" | jq -s ".[] | select(.status == \"$STATUS\")")
+            FILTERED_COUNT=$(echo "$FILTERED_RUNS" | jq -s 'length')
+            echo "状态为 $STATUS 的: $FILTERED_COUNT 个"
+          else
+            FILTERED_RUNS=$(echo "$ALL_RUNS" | jq -s '.[]')
+            FILTERED_COUNT=$TOTAL_COUNT
+          fi
+
+          # 过滤日期
+          if [ "$DAYS_OLD" -gt 0 ]; then
+            FILTERED_RUNS=$(echo "$FILTERED_RUNS" | jq -s ".[] | select(.created_at < \"$CUTOFF_DATE\")")
+            FILTERED_COUNT=$(echo "$FILTERED_RUNS" | jq -s 'length')
+            echo "超过 $DAYS_OLD 天的: $FILTERED_COUNT 个"
+          fi
+
+          # 按创建时间排序，保留最近 N 个
+          if [ "$KEEP_RECENT" -gt 0 ]; then
+            # 按时间倒序排序，跳过前 N 个
+            TO_DELETE=$(echo "$FILTERED_RUNS" | jq -s 'sort_by(.created_at) | reverse | .['"$KEEP_RECENT"':]')
+            DELETE_COUNT=$(echo "$TO_DELETE" | jq 'length')
+            echo "将删除: $DELETE_COUNT 个 (保留最近 $KEEP_RECENT 个)"
+          else
+            TO_DELETE=$(echo "$FILTERED_RUNS" | jq -s '.')
+            DELETE_COUNT=$(echo "$TO_DELETE" | jq 'length')
+            echo "将删除: $DELETE_COUNT 个"
+          fi
+
+          if [ "$DELETE_COUNT" -eq 0 ]; then
+            echo "没有需要删除的 runs"
+            exit 0
+          fi
+
+          # 显示将删除的 runs
+          echo ""
+          echo "=========================================="
+          echo "将删除的 runs:"
+          echo "=========================================="
+          echo "$TO_DELETE" | jq -r '.[] | "  #\(.run_number) - \(.name) (\(.status)) - \(.created_at)"'
+
+          # 如果是试运行，不实际删除
+          if [ "$DRY_RUN" = "true" ]; then
+            echo ""
+            echo "=========================================="
+            echo "试运行模式，未实际删除任何 runs"
+            echo "=========================================="
+            exit 0
+          fi
+
+          # 实际删除
+          echo ""
+          echo "=========================================="
+          echo "开始删除..."
+          echo "=========================================="
+
+          DELETED=0
+          FAILED=0
+
+          echo "$TO_DELETE" | jq -c '.[]' | while read -r run; do
+            RUN_ID=$(echo "$run" | jq -r '.id')
+            RUN_NAME=$(echo "$run" | jq -r '.name')
+            RUN_NUMBER=$(echo "$run" | jq -r '.run_number')
+
+            echo -n "删除 #$RUN_NUMBER ($RUN_NAME)... "
+
+            if gh api -X DELETE "repos/$REPO/actions/runs/$RUN_ID" --silent 2>/dev/null; then
+              echo "成功"
+              DELETED=$((DELETED + 1))
+            else
+              echo "失败"
+              FAILED=$((FAILED + 1))
+            fi
+          done
+
+          echo ""
+          echo "=========================================="
+          echo "清理完成"
+          echo "=========================================="
+          echo "成功删除: $DELETED 个"
+          echo "删除失败: $FAILED 个"
+          echo "=========================================="
