@@ -3,6 +3,7 @@ import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:hive_flutter/hive_flutter.dart';
 import 'features/home/home_page.dart';
+import 'features/server/server_page.dart';
 import 'features/settings/settings_page.dart';
 import 'features/about/about_page.dart';
 import 'l10n/app_localizations.dart';
@@ -67,7 +68,7 @@ class MyApp extends ConsumerWidget {
 
 /// 主页面
 ///
-/// 包含底栏导航，支持在主页、配置、关于之间切换
+/// 包含底栏导航，支持在主页、服务端、配置、关于之间切换
 class MainPage extends ConsumerWidget {
   const MainPage({super.key});
 
@@ -79,6 +80,7 @@ class MainPage extends ConsumerWidget {
     // 页面列表
     final pages = [
       const HomePage(),
+      const ServerPage(),
       const SettingsPage(),
       const AboutPage(),
     ];
@@ -98,6 +100,11 @@ class MainPage extends ConsumerWidget {
             icon: const Icon(Icons.home_outlined),
             selectedIcon: const Icon(Icons.home),
             label: l10n.navHome,
+          ),
+          NavigationDestination(
+            icon: const Icon(Icons.cloud_outlined),
+            selectedIcon: const Icon(Icons.cloud),
+            label: l10n.navServer,
           ),
           NavigationDestination(
             icon: const Icon(Icons.settings_outlined),

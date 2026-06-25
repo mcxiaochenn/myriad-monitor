@@ -30,22 +30,54 @@ class ServerConfig {
 
   ServerConfig({
     this.autoStart = true,
-    this.port = 8080,
+    this.port = 19190, // 使用不常见的端口
     this.address = '0.0.0.0',
     this.pushInterval = 1,
     this.enableDiscovery = true,
-    this.deviceName = 'Myriad Monitor',
-  });
+    String? deviceName,
+  }) : deviceName = deviceName ?? _generateDeviceName();
+
+  /// 随机生成设备名称（跟随系统语言）
+  static String _generateDeviceName() {
+    final random = DateTime.now().millisecondsSinceEpoch;
+
+    // 中文名称
+    final zhAdjectives = [
+      '快乐的', '勇敢的', '聪明的', '优雅的', '神秘的',
+      '闪耀的', '温柔的', '强大的', '敏捷的', '安静的',
+    ];
+    final zhNouns = [
+      '熊猫', '海豚', '凤凰', '麒麟', '白虎',
+      '青龙', '朱雀', '玄武', '玉兔', '金龙',
+    ];
+
+    // 英文名称
+    final enAdjectives = [
+      'Happy', 'Brave', 'Smart', 'Elegant', 'Mystic',
+      'Shining', 'Gentle', 'Powerful', 'Swift', 'Calm',
+    ];
+    final enNouns = [
+      'Panda', 'Dolphin', 'Phoenix', 'Unicorn', 'Tiger',
+      'Dragon', 'Falcon', 'Turtle', 'Rabbit', 'Lion',
+    ];
+
+    // 根据系统语言选择
+    final locale = WidgetsBinding.instance.platformDispatcher.locale;
+    final isZh = locale.languageCode == 'zh';
+
+    final adjectives = isZh ? zhAdjectives : enAdjectives;
+    final nouns = isZh ? zhNouns : enNouns;
+
+    final adj = adjectives[random % adjectives.length];
+    final noun = nouns[(random ~/ 10) % nouns.length];
+
+    return '$adj$noun';
+  }
 }
 
 /// 配置页面
 ///
-/// 提供服务器相关配置选项，包括：
-/// - 服务器端口、地址配置
-/// - 数据推送间隔
-/// - 设备发现开关
-/// - 设备名称设置
-/// - 语言切换
+/// 提供服务器相关配置选项
 class SettingsPage extends ConsumerWidget {
   const SettingsPage({super.key});
 
@@ -53,7 +85,6 @@ class SettingsPage extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final config = ref.watch(serverConfigProvider);
     final l10n = AppLocalizations.of(context);
-    final languageMode = ref.watch(languageModeProvider);
 
     return Scaffold(
       appBar: AppBar(
@@ -62,12 +93,6 @@ class SettingsPage extends ConsumerWidget {
       ),
       body: ListView(
         children: [
-          // 语言配置区域
-          _buildSectionHeader(context, l10n.language),
-          _buildLanguageSelector(context, ref, l10n, languageMode),
-
-          const Divider(),
-
           // 服务器配置区域
           _buildSectionHeader(context, l10n.serverConfig),
           SwitchListTile(
@@ -132,6 +157,18 @@ class SettingsPage extends ConsumerWidget {
 
           const Divider(),
 
+          // 语言设置（二级菜单）
+          _buildSectionHeader(context, l10n.language),
+          ListTile(
+            leading: const Icon(Icons.language),
+            title: Text(l10n.language),
+            subtitle: Text(_getLanguageName(ref, l10n)),
+            trailing: const Icon(Icons.chevron_right),
+            onTap: () => _showLanguageDialog(context, ref, l10n),
+          ),
+
+          const Divider(),
+
           // 数据存储配置区域
           _buildSectionHeader(context, l10n.dataStorage),
           ListTile(
@@ -151,51 +188,79 @@ class SettingsPage extends ConsumerWidget {
     );
   }
 
-  /// 构建语言选择器
-  Widget _buildLanguageSelector(
+  /// 获取当前语言名称
+  String _getLanguageName(WidgetRef ref, AppLocalizations l10n) {
+    final mode = ref.watch(languageModeProvider);
+    switch (mode) {
+      case LanguageMode.system:
+        return l10n.systemDefault;
+      case LanguageMode.chinese:
+        return l10n.chinese;
+      case LanguageMode.english:
+        return l10n.english;
+    }
+  }
+
+  /// 显示语言选择对话框
+  void _showLanguageDialog(
     BuildContext context,
     WidgetRef ref,
     AppLocalizations l10n,
-    LanguageMode currentMode,
   ) {
-    return Column(
-      children: [
-        RadioListTile<LanguageMode>(
-          title: Text(l10n.systemDefault),
-          value: LanguageMode.system,
-          groupValue: currentMode,
-          onChanged: (value) {
-            if (value != null) {
-              ref.read(languageModeProvider.notifier).setLanguageMode(value);
-              ref.read(localeProvider.notifier).setLocale(null);
-            }
-          },
+    final currentMode = ref.read(languageModeProvider);
+
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text(l10n.language),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            RadioListTile<LanguageMode>(
+              title: Text(l10n.systemDefault),
+              value: LanguageMode.system,
+              groupValue: currentMode,
+              onChanged: (value) {
+                if (value != null) {
+                  ref.read(languageModeProvider.notifier).setLanguageMode(value);
+                  ref.read(localeProvider.notifier).setLocale(null);
+                  Navigator.pop(context);
+                }
+              },
+            ),
+            RadioListTile<LanguageMode>(
+              title: Text(l10n.chinese),
+              subtitle: const Text('中文'),
+              value: LanguageMode.chinese,
+              groupValue: currentMode,
+              onChanged: (value) {
+                if (value != null) {
+                  ref.read(languageModeProvider.notifier).setLanguageMode(value);
+                  ref
+                      .read(localeProvider.notifier)
+                      .setLocale(const Locale('zh', 'CN'));
+                  Navigator.pop(context);
+                }
+              },
+            ),
+            RadioListTile<LanguageMode>(
+              title: Text(l10n.english),
+              subtitle: const Text('English'),
+              value: LanguageMode.english,
+              groupValue: currentMode,
+              onChanged: (value) {
+                if (value != null) {
+                  ref.read(languageModeProvider.notifier).setLanguageMode(value);
+                  ref
+                      .read(localeProvider.notifier)
+                      .setLocale(const Locale('en', 'US'));
+                  Navigator.pop(context);
+                }
+              },
+            ),
+          ],
         ),
-        RadioListTile<LanguageMode>(
-          title: Text(l10n.chinese),
-          subtitle: const Text('中文'),
-          value: LanguageMode.chinese,
-          groupValue: currentMode,
-          onChanged: (value) {
-            if (value != null) {
-              ref.read(languageModeProvider.notifier).setLanguageMode(value);
-              ref.read(localeProvider.notifier).setLocale(const Locale('zh', 'CN'));
-            }
-          },
-        ),
-        RadioListTile<LanguageMode>(
-          title: Text(l10n.english),
-          subtitle: const Text('English'),
-          value: LanguageMode.english,
-          groupValue: currentMode,
-          onChanged: (value) {
-            if (value != null) {
-              ref.read(languageModeProvider.notifier).setLanguageMode(value);
-              ref.read(localeProvider.notifier).setLocale(const Locale('en', 'US'));
-            }
-          },
-        ),
-      ],
+      ),
     );
   }
 
@@ -387,7 +452,6 @@ class SettingsPage extends ConsumerWidget {
           ),
           FilledButton(
             onPressed: () {
-              // TODO: 实现清除设备数据
               Navigator.pop(context);
               ScaffoldMessenger.of(context).showSnackBar(
                 SnackBar(
@@ -420,7 +484,6 @@ class SettingsPage extends ConsumerWidget {
           ),
           FilledButton(
             onPressed: () {
-              // TODO: 实现清除历史数据
               Navigator.pop(context);
               ScaffoldMessenger.of(context).showSnackBar(
                 SnackBar(

@@ -49,6 +49,9 @@ dependencies:
   # 状态管理
   flutter_riverpod: ^2.4.0
 
+  # URL 启动
+  url_launcher: ^6.2.0
+
 dev_dependencies:
   flutter_test:
     sdk: flutter

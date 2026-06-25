@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:url_launcher/url_launcher.dart';
 import '../../l10n/app_localizations.dart';
 
 /// 关于页面
@@ -60,7 +61,7 @@ class AboutPage extends StatelessWidget {
                 Padding(
                   padding: const EdgeInsets.symmetric(horizontal: 40),
                   child: Text(
-                    l10n.appDescription,
+                    l10n.appMeaning,
                     textAlign: TextAlign.center,
                     style: theme.textTheme.bodySmall?.copyWith(
                       color: colorScheme.onSurfaceVariant,
@@ -69,6 +70,23 @@ class AboutPage extends StatelessWidget {
                 ),
               ],
             ),
+          ),
+
+          const Divider(),
+
+          // 关于本软件（二级菜单）
+          _buildSectionHeader(context, l10n.aboutSoftware),
+          ListTile(
+            leading: Icon(Icons.code, color: colorScheme.primary),
+            title: Text(l10n.techStack),
+            trailing: const Icon(Icons.chevron_right),
+            onTap: () => _showTechStackDialog(context, l10n),
+          ),
+          ListTile(
+            leading: Icon(Icons.description, color: colorScheme.primary),
+            title: Text(l10n.openSourceLicense),
+            trailing: const Icon(Icons.chevron_right),
+            onTap: () => _showLicenseDialog(context, l10n),
           ),
 
           const Divider(),
@@ -102,16 +120,6 @@ class AboutPage extends StatelessWidget {
 
           const Divider(),
 
-          // 技术栈
-          _buildSectionHeader(context, l10n.techStack),
-          _buildTechItem(context, 'Flutter', l10n.crossPlatformFramework),
-          _buildTechItem(context, 'Riverpod', l10n.stateManagement),
-          _buildTechItem(context, 'WebSocket', l10n.deviceCommunication),
-          _buildTechItem(context, 'fl_chart', l10n.chartRendering),
-          _buildTechItem(context, 'Hive', l10n.localStorage),
-
-          const Divider(),
-
           // 开发者信息
           _buildSectionHeader(context, l10n.developer),
           ListTile(
@@ -124,6 +132,7 @@ class AboutPage extends StatelessWidget {
             ),
             title: const Text('辰渊尘'),
             subtitle: const Text('mcxiaochenn'),
+            onTap: () => _launchUrl('https://github.com/mcxiaochenn'),
           ),
           ListTile(
             leading: CircleAvatar(
@@ -135,19 +144,20 @@ class AboutPage extends StatelessWidget {
             ),
             title: const Text('GitHub'),
             subtitle: const Text('github.com/mcxiaochenn/myriad-monitor'),
-            onTap: () {
-              // TODO: 打开 GitHub 链接
-            },
+            onTap: () =>
+                _launchUrl('https://github.com/mcxiaochenn/myriad-monitor'),
           ),
-
-          const Divider(),
-
-          // 开源许可
-          _buildSectionHeader(context, l10n.openSourceLicense),
-          const ListTile(
-            title: Text('MIT License'),
-            subtitle: Text('Copyright (c) 2026 辰渊尘'),
-            trailing: Icon(Icons.chevron_right),
+          ListTile(
+            leading: CircleAvatar(
+              backgroundColor: colorScheme.primaryContainer,
+              child: Icon(
+                Icons.language,
+                color: colorScheme.onPrimaryContainer,
+              ),
+            ),
+            title: Text(l10n.blog),
+            subtitle: const Text('blog.mcxiaochen.top'),
+            onTap: () => _launchUrl('https://blog.mcxiaochen.top'),
           ),
 
           const SizedBox(height: 40),
@@ -184,15 +194,116 @@ class AboutPage extends StatelessWidget {
     );
   }
 
+  /// 显示技术栈对话框
+  void _showTechStackDialog(BuildContext context, AppLocalizations l10n) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text(l10n.techStack),
+        content: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              _buildTechItem(
+                context,
+                'Flutter',
+                l10n.crossPlatformFramework,
+                'https://flutter.dev',
+              ),
+              _buildTechItem(
+                context,
+                'Riverpod',
+                l10n.stateManagement,
+                'https://riverpod.dev',
+              ),
+              _buildTechItem(
+                context,
+                'WebSocket',
+                l10n.deviceCommunication,
+                'https://developer.mozilla.org/en-US/docs/Web/API/WebSockets_API',
+              ),
+              _buildTechItem(
+                context,
+                'fl_chart',
+                l10n.chartRendering,
+                'https://pub.dev/packages/fl_chart',
+              ),
+              _buildTechItem(
+                context,
+                'Hive',
+                l10n.localStorage,
+                'https://pub.dev/packages/hive',
+              ),
+            ],
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: Text(l10n.close),
+          ),
+        ],
+      ),
+    );
+  }
+
   /// 构建技术栈项
   Widget _buildTechItem(
     BuildContext context,
     String name,
     String description,
+    String url,
   ) {
     return ListTile(
       title: Text(name),
       subtitle: Text(description),
+      trailing: const Icon(Icons.open_in_new, size: 16),
+      onTap: () => _launchUrl(url),
     );
+  }
+
+  /// 显示许可证对话框
+  void _showLicenseDialog(BuildContext context, AppLocalizations l10n) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text(l10n.openSourceLicense),
+        content: const SingleChildScrollView(
+          child: Text(
+            'MIT License\n\n'
+            'Copyright (c) 2026 辰渊尘\n\n'
+            'Permission is hereby granted, free of charge, to any person obtaining a copy '
+            'of this software and associated documentation files (the "Software"), to deal '
+            'in the Software without restriction, including without limitation the rights '
+            'to use, copy, modify, merge, publish, distribute, sublicense, and/or sell '
+            'copies of the Software, and to permit persons to whom the Software is '
+            'furnished to do so, subject to the following conditions:\n\n'
+            'The above copyright notice and this permission notice shall be included in all '
+            'copies or substantial portions of the Software.\n\n'
+            'THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR '
+            'IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, '
+            'FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE '
+            'AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER '
+            'LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, '
+            'OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE '
+            'SOFTWARE.',
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: Text(l10n.close),
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// 打开 URL
+  Future<void> _launchUrl(String url) async {
+    final uri = Uri.parse(url);
+    if (await canLaunchUrl(uri)) {
+      await launchUrl(uri);
+    }
   }
 }
