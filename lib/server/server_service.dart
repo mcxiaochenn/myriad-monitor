@@ -5,6 +5,7 @@ import 'package:shelf_web_socket/shelf_web_socket.dart';
 import 'package:web_socket_channel/web_socket_channel.dart';
 
 import 'system_info_collector.dart';
+import 'windows_collector.dart';
 
 /// WebSocket 服务器服务
 ///
@@ -42,11 +43,13 @@ class ServerService {
   /// [port] 服务器端口，默认 8080
   /// [address] 监听地址，默认 '0.0.0.0'（接受所有连接）
   /// [pushInterval] 数据推送间隔，默认 1 秒
+  /// [collector] 系统信息采集器，默认使用 WindowsCollector
   ServerService({
     this.port = 8080,
     this.address = '0.0.0.0',
     this.pushInterval = const Duration(seconds: 1),
-  }) : _collector = SystemInfoCollector();
+    SystemInfoCollector? collector,
+  }) : _collector = collector ?? WindowsCollector();
 
   /// 服务器是否正在运行
   bool get isRunning => _isRunning;

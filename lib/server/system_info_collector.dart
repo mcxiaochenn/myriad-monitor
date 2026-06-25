@@ -123,11 +123,11 @@ class NetworkTraffic {
   }
 }
 
-/// 系统信息采集器
+/// 系统信息采集器抽象接口
 ///
-/// 负责采集 CPU、内存、磁盘、网络等系统资源信息
-/// 支持定时采集和手动采集两种模式
-class SystemInfoCollector {
+/// 定义跨平台系统信息采集的标准接口。
+/// 各平台（Windows/Linux/macOS）分别实现此接口。
+abstract class SystemInfoCollector {
   /// 定时采集间隔（默认 1 秒）
   final Duration collectionInterval;
 
@@ -137,12 +137,6 @@ class SystemInfoCollector {
   /// 系统信息流控制器
   final StreamController<SystemInfo> _infoStreamController =
       StreamController<SystemInfo>.broadcast();
-
-  /// 上一次采集的网络流量数据（用于计算速率）
-  NetworkTraffic? _lastNetworkTraffic;
-
-  /// 上一次网络采集时间
-  DateTime? _lastNetworkCollectTime;
 
   /// 构造函数
   ///
@@ -180,7 +174,6 @@ class SystemInfoCollector {
   ///
   /// 返回包含 CPU、内存、磁盘、网络信息的 [SystemInfo] 对象
   Future<SystemInfo> collectAll() async {
-    // TODO: 并发采集各项系统信息并汇总
     final cpuUsage = await collectCpuUsage();
     final memoryInfo = await collectMemoryInfo();
     final disks = await collectDiskInfo();
@@ -200,11 +193,7 @@ class SystemInfoCollector {
   /// 采集 CPU 使用率
   ///
   /// 返回 CPU 使用率百分比（0-100）
-  Future<double> collectCpuUsage() async {
-    // TODO: 使用 system_info2 或平台原生方式采集 CPU 使用率
-    // 可能需要通过 Platform Channel 调用原生代码获取实时 CPU 数据
-    return 0.0;
-  }
+  Future<double> collectCpuUsage();
 
   /// 采集内存使用情况
   ///
@@ -212,46 +201,17 @@ class SystemInfoCollector {
   /// - used: 已使用内存（字节）
   /// - total: 总内存（字节）
   /// - usage: 使用率（百分比）
-  Future<Map<String, dynamic>> collectMemoryInfo() async {
-    // TODO: 使用 system_info2 获取物理内存信息
-    // final totalMemory = await SystemInfo2.getTotalPhysicalMemory();
-    // final freeMemory = await SystemInfo2.getFreePhysicalMemory();
-    return {
-      'used': 0,
-      'total': 0,
-      'usage': 0.0,
-    };
-  }
+  Future<Map<String, dynamic>> collectMemoryInfo();
 
   /// 采集磁盘信息
   ///
   /// 返回所有磁盘分区的信息列表
-  Future<List<DiskInfo>> collectDiskInfo() async {
-    // TODO: 获取系统磁盘分区信息
-    // 需要通过 Platform Channel 调用原生代码获取磁盘使用情况
-    return [];
-  }
+  Future<List<DiskInfo>> collectDiskInfo();
 
   /// 采集网络流量
   ///
   /// 返回当前网络上传/下载速率和累计流量
-  Future<NetworkTraffic> collectNetworkTraffic() async {
-    // TODO: 获取网络接口流量数据
-    // 需要通过 Platform Channel 调用原生代码获取网络统计
-    // 并与上次数据对比计算速率
-
-    const traffic = NetworkTraffic(
-      uploadSpeed: 0,
-      downloadSpeed: 0,
-      totalUploaded: 0,
-      totalDownloaded: 0,
-    );
-
-    _lastNetworkTraffic = traffic;
-    _lastNetworkCollectTime = DateTime.now();
-
-    return traffic;
-  }
+  Future<NetworkTraffic> collectNetworkTraffic();
 
   /// 释放资源
   ///
