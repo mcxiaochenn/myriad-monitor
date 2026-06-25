@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../client/device_manager.dart';
 import '../../core/discovery/udp_discovery.dart';
 import '../../core/discovery/discovery_integration.dart';
+import '../settings/settings_page.dart';
 import 'device_card.dart';
 
 /// 设备管理器 Provider
@@ -19,9 +20,11 @@ final deviceManagerProvider = Provider<DeviceManager>((ref) {
 /// 设备发现集成服务 Provider
 final discoveryIntegrationProvider = Provider<DiscoveryIntegration>((ref) {
   final deviceManager = ref.read(deviceManagerProvider);
+  final config = ref.read(serverConfigProvider);
+
   final discoveryService = UdpDiscoveryService(
-    deviceName: 'Myriad Monitor',
-    servicePort: 8080,
+    deviceName: config.deviceName,
+    servicePort: config.port,
   );
 
   final integration = DiscoveryIntegration(
@@ -40,57 +43,68 @@ final discoveryIntegrationProvider = Provider<DiscoveryIntegration>((ref) {
 /// 搜索关键词 Provider
 final searchQueryProvider = StateProvider<String>((ref) => '');
 
-/// 设备列表 Provider（支持搜索过滤）
-final deviceListProvider = Provider<List<ManagedDevice>>((ref) {
-  // 监听设备发现集成服务，确保设备列表更新时触发刷新
-  ref.watch(discoveryIntegrationProvider);
+/// 设备列表 Provider（响应式）
+final deviceListProvider =
+    StateNotifierProvider<DeviceListNotifier, List<ManagedDevice>>((ref) {
   final manager = ref.watch(deviceManagerProvider);
-  final searchQuery = ref.watch(searchQueryProvider);
+  return DeviceListNotifier(manager);
+});
 
-  final devices = manager.devices;
+/// 设备列表状态管理
+class DeviceListNotifier extends StateNotifier<List<ManagedDevice>> {
+  final DeviceManager _manager;
 
-  // 如果搜索关键词为空，返回所有设备
-  if (searchQuery.isEmpty) {
-    return devices;
+  DeviceListNotifier(this._manager) : super(_manager.devices) {
+    // 监听设备列表变化
+    _manager.devicesChangedStream.listen((devices) {
+      state = List.unmodifiable(devices);
+    });
+    // 监听设备状态变化
+    _manager.deviceStatusStream.listen((_) {
+      state = List.unmodifiable(_manager.devices);
+    });
   }
 
-  // 过滤设备列表
-  final query = searchQuery.toLowerCase();
-  return devices.where((device) {
-    return device.name.toLowerCase().contains(query) ||
-        device.ipAddress.contains(query);
-  }).toList();
-});
+  /// 添加设备
+  void addDevice(ManagedDevice device) {
+    _manager.addDevice(device);
+    state = List.unmodifiable(_manager.devices);
+  }
+
+  /// 移除设备
+  void removeDevice(String deviceId) {
+    _manager.removeDevice(deviceId);
+    state = List.unmodifiable(_manager.devices);
+  }
+}
 
 /// 设备列表主页
 ///
 /// 展示所有已发现的设备卡片列表，支持搜索和手动添加设备。
-/// 每张卡片显示设备名称、IP 地址和状态指示灯。
-/// 点击卡片可导航至设备详情页。
 class HomePage extends ConsumerWidget {
   const HomePage({super.key});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final devices = ref.watch(deviceListProvider);
+    final l10n = _L10n(context);
 
     return Scaffold(
-      // 透明 AppBar，配合高斯模糊背景
       appBar: AppBar(
-        title: const Text('万镜 · 设备列表'),
+        title: Text(l10n.deviceList),
         centerTitle: true,
         actions: [
           // 搜索按钮
           IconButton(
             icon: const Icon(Icons.search),
             onPressed: () => _showSearchDialog(context, ref),
-            tooltip: '搜索设备',
+            tooltip: l10n.searchDevice,
           ),
           // 添加设备按钮
           IconButton(
             icon: const Icon(Icons.add_circle_outline),
             onPressed: () => _showAddDeviceDialog(context, ref),
-            tooltip: '添加设备',
+            tooltip: l10n.addDevice,
           ),
         ],
       ),
@@ -125,7 +139,6 @@ class HomePage extends ConsumerWidget {
       context: context,
       builder: (context) => _AddDeviceDialog(
         onAdd: (name, ip, port) {
-          final manager = ref.read(deviceManagerProvider);
           final device = ManagedDevice(
             deviceId: DateTime.now().millisecondsSinceEpoch.toString(),
             name: name,
@@ -134,12 +147,14 @@ class HomePage extends ConsumerWidget {
             onlineStatus: DeviceOnlineStatus.unknown,
             discoveredAt: DateTime.now(),
           );
-          manager.addDevice(device);
+
+          // 使用 DeviceListNotifier 添加设备
+          ref.read(deviceListProvider.notifier).addDevice(device);
 
           // 显示成功提示
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
-              content: Text('已添加设备: $name'),
+              content: Text(_L10n(context).deviceAdded(name)),
               duration: const Duration(seconds: 2),
               behavior: SnackBarBehavior.floating,
             ),
@@ -181,10 +196,19 @@ class HomePage extends ConsumerWidget {
     // 统计在线设备数
     final onlineCount = devices.where((d) => d.isOnline).length;
     final searchQuery = ref.watch(searchQueryProvider);
+    final l10n = _L10n(context);
+
+    // 过滤设备列表
+    final filteredDevices = searchQuery.isEmpty
+        ? devices
+        : devices.where((d) {
+            final query = searchQuery.toLowerCase();
+            return d.name.toLowerCase().contains(query) ||
+                d.ipAddress.contains(query);
+          }).toList();
 
     return RefreshIndicator(
       onRefresh: () async {
-        // TODO: 触发设备重新发现
         await Future<void>.delayed(const Duration(seconds: 1));
       },
       child: CustomScrollView(
@@ -203,8 +227,8 @@ class HomePage extends ConsumerWidget {
                   const SizedBox(width: 8),
                   Text(
                     searchQuery.isNotEmpty
-                        ? '搜索结果: ${devices.length} 台设备'
-                        : '共 ${devices.length} 台设备，$onlineCount 台在线',
+                        ? l10n.searchResult(filteredDevices.length)
+                        : l10n.deviceCount(filteredDevices.length, onlineCount),
                     style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                           color: Theme.of(context).colorScheme.onSurfaceVariant,
                         ),
@@ -215,7 +239,7 @@ class HomePage extends ConsumerWidget {
                       onPressed: () {
                         ref.read(searchQueryProvider.notifier).state = '';
                       },
-                      child: const Text('清除搜索'),
+                      child: Text(l10n.clearSearch),
                     ),
                   ],
                 ],
@@ -227,13 +251,13 @@ class HomePage extends ConsumerWidget {
           SliverList(
             delegate: SliverChildBuilderDelegate(
               (context, index) {
-                final device = devices[index];
+                final device = filteredDevices[index];
                 return DeviceCard(
                   device: device,
                   onTap: () => _navigateToDetail(context, device),
                 );
               },
-              childCount: devices.length,
+              childCount: filteredDevices.length,
             ),
           ),
 
@@ -246,10 +270,11 @@ class HomePage extends ConsumerWidget {
     );
   }
 
-  /// 空状态视图 —— 暂未发现任何设备
+  /// 空状态视图
   Widget _buildEmptyState(BuildContext context, WidgetRef ref) {
     final colorScheme = Theme.of(context).colorScheme;
     final searchQuery = ref.watch(searchQueryProvider);
+    final l10n = _L10n(context);
 
     return Center(
       child: Column(
@@ -262,7 +287,7 @@ class HomePage extends ConsumerWidget {
           ),
           const SizedBox(height: 16),
           Text(
-            searchQuery.isNotEmpty ? '未找到匹配的设备' : '暂未发现设备',
+            searchQuery.isNotEmpty ? l10n.noDeviceSearch : l10n.noDeviceFound,
             style: Theme.of(context).textTheme.titleMedium?.copyWith(
                   color: colorScheme.onSurfaceVariant,
                 ),
@@ -270,8 +295,8 @@ class HomePage extends ConsumerWidget {
           const SizedBox(height: 8),
           Text(
             searchQuery.isNotEmpty
-                ? '请尝试其他关键词'
-                : '请确保其他设备在同一局域网内',
+                ? l10n.tryOtherKeywords
+                : l10n.ensureSameNetwork,
             style: Theme.of(context).textTheme.bodySmall?.copyWith(
                   color: colorScheme.onSurfaceVariant.withValues(alpha: 0.7),
                 ),
@@ -283,15 +308,13 @@ class HomePage extends ConsumerWidget {
                 ref.read(searchQueryProvider.notifier).state = '';
               },
               icon: const Icon(Icons.clear),
-              label: const Text('清除搜索'),
+              label: Text(l10n.clearSearch),
             )
           else
             FilledButton.icon(
-              onPressed: () {
-                // TODO: 触发手动设备发现
-              },
+              onPressed: () {},
               icon: const Icon(Icons.refresh),
-              label: const Text('重新搜索'),
+              label: Text(l10n.refresh),
             ),
         ],
       ),
@@ -300,15 +323,36 @@ class HomePage extends ConsumerWidget {
 
   /// 导航到设备详情页
   void _navigateToDetail(BuildContext context, ManagedDevice device) {
-    // TODO: 替换为真实的详情页路由
+    final l10n = _L10n(context);
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
-        content: Text('即将打开 ${device.name} 的监控面板'),
+        content: Text(l10n.openingDevice(device.name)),
         duration: const Duration(seconds: 1),
         behavior: SnackBarBehavior.floating,
       ),
     );
   }
+}
+
+/// 简化的本地化辅助类
+class _L10n {
+  final BuildContext context;
+  _L10n(this.context);
+
+  String get deviceList => '设备列表';
+  String get searchDevice => '搜索设备';
+  String get addDevice => '添加设备';
+  String get clearSearch => '清除搜索';
+  String get noDeviceFound => '暂未发现设备';
+  String get noDeviceSearch => '未找到匹配的设备';
+  String get tryOtherKeywords => '请尝试其他关键词';
+  String get ensureSameNetwork => '请确保其他设备在同一局域网内';
+  String get refresh => '重新搜索';
+
+  String deviceCount(int total, int online) => '共 $total 台设备，$online 台在线';
+  String searchResult(int count) => '搜索结果: $count 台设备';
+  String deviceAdded(String name) => '已添加设备: $name';
+  String openingDevice(String name) => '即将打开 $name 的监控面板';
 }
 
 /// 搜索对话框
@@ -390,7 +434,7 @@ class _AddDeviceDialogState extends State<_AddDeviceDialog> {
   final _formKey = GlobalKey<FormState>();
   final _nameController = TextEditingController();
   final _ipController = TextEditingController();
-  final _portController = TextEditingController(text: '8080');
+  final _portController = TextEditingController(text: '19190');
 
   @override
   void dispose() {
@@ -436,8 +480,8 @@ class _AddDeviceDialogState extends State<_AddDeviceDialog> {
                 if (value == null || value.isEmpty) {
                   return '请输入 IP 地址';
                 }
-                // 简单的 IP 地址格式验证
-                final ipRegex = RegExp(r'^\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}$');
+                final ipRegex =
+                    RegExp(r'^\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}$');
                 if (!ipRegex.hasMatch(value)) {
                   return '请输入有效的 IP 地址';
                 }
@@ -449,7 +493,7 @@ class _AddDeviceDialogState extends State<_AddDeviceDialog> {
               controller: _portController,
               decoration: const InputDecoration(
                 labelText: '端口号',
-                hintText: '默认 8080',
+                hintText: '默认 19190',
                 prefixIcon: Icon(Icons.numbers),
               ),
               keyboardType: TextInputType.number,

@@ -1,41 +1,73 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../../l10n/app_localizations.dart';
 import '../../l10n/locale_provider.dart';
 
-/// 服务器配置 Provider
-final serverConfigProvider = StateProvider<ServerConfig>((ref) {
-  return ServerConfig();
+/// 服务器配置 Provider（异步加载）
+final serverConfigProvider =
+    StateNotifierProvider<ServerConfigNotifier, ServerConfig>((ref) {
+  return ServerConfigNotifier();
 });
 
-/// 服务器配置模型
-class ServerConfig {
-  /// 是否自动启动服务器
-  bool autoStart;
+/// 服务器配置状态管理
+class ServerConfigNotifier extends StateNotifier<ServerConfig> {
+  ServerConfigNotifier() : super(ServerConfig()) {
+    _loadConfig();
+  }
 
-  /// 服务器端口
-  int port;
+  /// 从本地存储加载配置
+  Future<void> _loadConfig() async {
+    final prefs = await SharedPreferences.getInstance();
 
-  /// 监听地址
-  String address;
+    // 加载设备名称，如果没有则生成一个新的
+    String? deviceName = prefs.getString('device_name');
+    if (deviceName == null || deviceName.isEmpty) {
+      deviceName = _generateDeviceName();
+      await prefs.setString('device_name', deviceName);
+    }
 
-  /// 数据推送间隔（秒）
-  int pushInterval;
+    state = ServerConfig(
+      autoStart: prefs.getBool('auto_start') ?? true,
+      port: prefs.getInt('server_port') ?? 19190,
+      address: prefs.getString('listen_address') ?? '0.0.0.0',
+      pushInterval: prefs.getInt('push_interval') ?? 1,
+      enableDiscovery: prefs.getBool('enable_discovery') ?? true,
+      deviceName: deviceName,
+    );
+  }
 
-  /// 是否启用设备发现
-  bool enableDiscovery;
+  /// 保存配置到本地存储
+  Future<void> saveConfig(ServerConfig config) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool('auto_start', config.autoStart);
+    await prefs.setInt('server_port', config.port);
+    await prefs.setString('listen_address', config.address);
+    await prefs.setInt('push_interval', config.pushInterval);
+    await prefs.setBool('enable_discovery', config.enableDiscovery);
+    await prefs.setString('device_name', config.deviceName);
+    state = config;
+  }
 
-  /// 设备名称
-  String deviceName;
-
-  ServerConfig({
-    this.autoStart = true,
-    this.port = 19190, // 使用不常见的端口
-    this.address = '0.0.0.0',
-    this.pushInterval = 1,
-    this.enableDiscovery = true,
+  /// 更新配置
+  void updateConfig({
+    bool? autoStart,
+    int? port,
+    String? address,
+    int? pushInterval,
+    bool? enableDiscovery,
     String? deviceName,
-  }) : deviceName = deviceName ?? _generateDeviceName();
+  }) {
+    final newConfig = ServerConfig(
+      autoStart: autoStart ?? state.autoStart,
+      port: port ?? state.port,
+      address: address ?? state.address,
+      pushInterval: pushInterval ?? state.pushInterval,
+      enableDiscovery: enableDiscovery ?? state.enableDiscovery,
+      deviceName: deviceName ?? state.deviceName,
+    );
+    saveConfig(newConfig);
+  }
 
   /// 随机生成设备名称（跟随系统语言）
   static String _generateDeviceName() {
@@ -75,6 +107,36 @@ class ServerConfig {
   }
 }
 
+/// 服务器配置模型
+class ServerConfig {
+  /// 是否自动启动服务器
+  final bool autoStart;
+
+  /// 服务器端口
+  final int port;
+
+  /// 监听地址
+  final String address;
+
+  /// 数据推送间隔（秒）
+  final int pushInterval;
+
+  /// 是否启用设备发现
+  final bool enableDiscovery;
+
+  /// 设备名称
+  final String deviceName;
+
+  ServerConfig({
+    this.autoStart = true,
+    this.port = 19190,
+    this.address = '0.0.0.0',
+    this.pushInterval = 1,
+    this.enableDiscovery = true,
+    this.deviceName = 'Myriad Monitor',
+  });
+}
+
 /// 配置页面
 ///
 /// 提供服务器相关配置选项
@@ -100,14 +162,9 @@ class SettingsPage extends ConsumerWidget {
             subtitle: Text(l10n.autoStartServerDesc),
             value: config.autoStart,
             onChanged: (value) {
-              ref.read(serverConfigProvider.notifier).state = ServerConfig(
-                autoStart: value,
-                port: config.port,
-                address: config.address,
-                pushInterval: config.pushInterval,
-                enableDiscovery: config.enableDiscovery,
-                deviceName: config.deviceName,
-              );
+              ref.read(serverConfigProvider.notifier).updateConfig(
+                    autoStart: value,
+                  );
             },
           ),
           ListTile(
@@ -138,14 +195,9 @@ class SettingsPage extends ConsumerWidget {
             subtitle: Text(l10n.enableDiscoveryDesc),
             value: config.enableDiscovery,
             onChanged: (value) {
-              ref.read(serverConfigProvider.notifier).state = ServerConfig(
-                autoStart: config.autoStart,
-                port: config.port,
-                address: config.address,
-                pushInterval: config.pushInterval,
-                enableDiscovery: value,
-                deviceName: config.deviceName,
-              );
+              ref.read(serverConfigProvider.notifier).updateConfig(
+                    enableDiscovery: value,
+                  );
             },
           ),
           ListTile(
@@ -302,14 +354,9 @@ class SettingsPage extends ConsumerWidget {
             onPressed: () {
               final port = int.tryParse(controller.text);
               if (port != null && port >= 1 && port <= 65535) {
-                ref.read(serverConfigProvider.notifier).state = ServerConfig(
-                  autoStart: config.autoStart,
-                  port: port,
-                  address: config.address,
-                  pushInterval: config.pushInterval,
-                  enableDiscovery: config.enableDiscovery,
-                  deviceName: config.deviceName,
-                );
+                ref.read(serverConfigProvider.notifier).updateConfig(
+                      port: port,
+                    );
                 Navigator.pop(context);
               }
             },
@@ -341,14 +388,9 @@ class SettingsPage extends ConsumerWidget {
           ),
           FilledButton(
             onPressed: () {
-              ref.read(serverConfigProvider.notifier).state = ServerConfig(
-                autoStart: config.autoStart,
-                port: config.port,
-                address: controller.text,
-                pushInterval: config.pushInterval,
-                enableDiscovery: config.enableDiscovery,
-                deviceName: config.deviceName,
-              );
+              ref.read(serverConfigProvider.notifier).updateConfig(
+                    address: controller.text,
+                  );
               Navigator.pop(context);
             },
             child: Text(l10n.save),
@@ -382,14 +424,9 @@ class SettingsPage extends ConsumerWidget {
             onPressed: () {
               final interval = int.tryParse(controller.text);
               if (interval != null && interval >= 1 && interval <= 60) {
-                ref.read(serverConfigProvider.notifier).state = ServerConfig(
-                  autoStart: config.autoStart,
-                  port: config.port,
-                  address: config.address,
-                  pushInterval: interval,
-                  enableDiscovery: config.enableDiscovery,
-                  deviceName: config.deviceName,
-                );
+                ref.read(serverConfigProvider.notifier).updateConfig(
+                      pushInterval: interval,
+                    );
                 Navigator.pop(context);
               }
             },
@@ -421,14 +458,9 @@ class SettingsPage extends ConsumerWidget {
           ),
           FilledButton(
             onPressed: () {
-              ref.read(serverConfigProvider.notifier).state = ServerConfig(
-                autoStart: config.autoStart,
-                port: config.port,
-                address: config.address,
-                pushInterval: config.pushInterval,
-                enableDiscovery: config.enableDiscovery,
-                deviceName: controller.text,
-              );
+              ref.read(serverConfigProvider.notifier).updateConfig(
+                    deviceName: controller.text,
+                  );
               Navigator.pop(context);
             },
             child: Text(l10n.save),
