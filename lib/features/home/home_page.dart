@@ -3,6 +3,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../client/device_manager.dart';
 import '../../client/client_service.dart';
+import '../../core/discovery/udp_discovery.dart';
+import '../../core/discovery/discovery_integration.dart';
 import 'device_card.dart';
 
 /// 设备管理器 Provider
@@ -15,8 +17,28 @@ final deviceManagerProvider = Provider<DeviceManager>((ref) {
   return manager;
 });
 
+/// 设备发现集成服务 Provider
+final discoveryIntegrationProvider = Provider<DiscoveryIntegration>((ref) {
+  final deviceManager = ref.read(deviceManagerProvider);
+  final discoveryService = UdpDiscoveryService();
+
+  final integration = DiscoveryIntegration(
+    discoveryService: discoveryService,
+    deviceManager: deviceManager,
+  );
+
+  // 启动集成服务
+  integration.start();
+
+  // 释放时停止服务
+  ref.onDispose(() => integration.dispose());
+  return integration;
+});
+
 /// 设备列表 Provider
 final deviceListProvider = Provider<List<ManagedDevice>>((ref) {
+  // 监听设备发现集成服务，确保设备列表更新时触发刷新
+  ref.watch(discoveryIntegrationProvider);
   final manager = ref.watch(deviceManagerProvider);
   return manager.devices;
 });
@@ -24,7 +46,7 @@ final deviceListProvider = Provider<List<ManagedDevice>>((ref) {
 /// 设备列表主页
 ///
 /// 展示所有已发现的设备卡片列表，支持下拉刷新搜索新设备。
-/// 每张卡片显示设备名称、操作系统和状态指示灯。
+/// 每张卡片显示设备名称、IP 地址和状态指示灯。
 /// 点击卡片可导航至设备详情页。
 class HomePage extends ConsumerWidget {
   const HomePage({super.key});
