@@ -25,6 +25,8 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## 常用命令
 
+Flutter 路径：`D:\flutter\bin`
+
 ```bash
 # 安装依赖
 flutter pub get
