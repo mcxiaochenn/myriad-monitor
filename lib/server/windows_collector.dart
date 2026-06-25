@@ -365,7 +365,7 @@ class WindowsCollector extends SystemInfoCollector {
   /// 查询指定驱动器的文件系统类型
   String _queryFileSystemType(String drivePath) {
     final pDrivePath = drivePath.toNativeUtf16();
-    final pFsNameBuffer = calloc<Utf16>(256);
+    final pFsNameBuffer = calloc<Uint16>(256);
     final pFsFlags = calloc<Uint32>();
 
     try {
@@ -376,13 +376,13 @@ class WindowsCollector extends SystemInfoCollector {
         nullptr, // 不需要序列号
         nullptr, // 不需要最大组件长度
         pFsFlags,
-        pFsNameBuffer,
+        pFsNameBuffer.cast(),
         256,
       );
 
       if (result == 0) return 'Unknown';
 
-      return pFsNameBuffer.toDartString();
+      return pFsNameBuffer.cast<Utf16>().toDartString();
     } finally {
       calloc.free(pDrivePath);
       calloc.free(pFsNameBuffer);
