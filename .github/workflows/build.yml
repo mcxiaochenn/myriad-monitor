@@ -18,7 +18,7 @@ jobs:
         with:
           channel: stable
 
-      # 生成平台目录（windows/, android/ 等）
+      # 生成平台目录
       - run: flutter create --project-name myriad_monitor --platforms windows .
 
       - run: flutter pub get
@@ -45,7 +45,7 @@ jobs:
         with:
           channel: stable
 
-      # 生成平台目录（android/, ios/ 等）
+      # 生成平台目录
       - run: flutter create --project-name myriad_monitor --platforms android .
 
       - run: flutter pub get
