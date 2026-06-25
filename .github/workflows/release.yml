@@ -34,14 +34,13 @@ jobs:
           Compress-Archive -Path build/windows/x64/runner/Release/* -DestinationPath myriad-monitor-windows-portable.zip
 
       # 创建安装包（使用 Inno Setup）
-      - name: Create installer
-        uses: Miniong/setup-inno@v1
-        with:
-          version: '6.2.2'
+      - name: Install Inno Setup
+        run: |
+          choco install innosetup -y
 
       - name: Build installer
         run: |
-          iscc windows/installer.iss
+          & "C:\Program Files (x86)\Inno Setup 6\ISCC.exe" windows\installer.iss
 
       - uses: actions/upload-artifact@v4
         with:
