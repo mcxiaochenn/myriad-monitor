@@ -2,7 +2,6 @@ import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../client/device_manager.dart';
-import '../../client/client_service.dart';
 import '../../core/discovery/udp_discovery.dart';
 import '../../core/discovery/discovery_integration.dart';
 import 'device_card.dart';
@@ -20,7 +19,10 @@ final deviceManagerProvider = Provider<DeviceManager>((ref) {
 /// 设备发现集成服务 Provider
 final discoveryIntegrationProvider = Provider<DiscoveryIntegration>((ref) {
   final deviceManager = ref.read(deviceManagerProvider);
-  final discoveryService = UdpDiscoveryService();
+  final discoveryService = UdpDiscoveryService(
+    deviceName: 'Myriad Monitor',
+    servicePort: 8080,
+  );
 
   final integration = DiscoveryIntegration(
     discoveryService: discoveryService,
