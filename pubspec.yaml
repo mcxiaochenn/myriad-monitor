@@ -16,6 +16,9 @@ dependencies:
   # WebSocket 通信
   web_socket_channel: ^2.4.0
 
+  # HTTP 服务器框架
+  shelf: ^1.4.0
+
   # 服务端 WebSocket 支持
   shelf_web_socket: ^2.0.0
 
