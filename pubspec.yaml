@@ -1,0 +1,41 @@
+name: myriad_monitor
+description: 系统资源监控工具 - 实时监控 CPU、内存、磁盘、网络等系统信息
+publish_to: 'none'
+version: 1.0.0+1
+
+environment:
+  sdk: '>=3.0.0 <4.0.0'
+
+dependencies:
+  flutter:
+    sdk: flutter
+
+  # 系统信息获取
+  system_info2: ^4.0.0
+
+  # WebSocket 通信
+  web_socket_channel: ^2.4.0
+
+  # 服务端 WebSocket 支持
+  shelf_web_socket: ^2.0.0
+
+  # 图表绘制
+  fl_chart: ^0.68.0
+
+  # 本地数据存储
+  hive: ^2.2.3
+
+  # 偏好设置存储
+  shared_preferences: ^2.2.0
+
+  # 状态管理
+  flutter_riverpod: ^2.4.0
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+
+  flutter_lints: ^3.0.0
+
+flutter:
+  uses-material-design: true
