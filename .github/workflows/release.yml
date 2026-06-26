@@ -173,35 +173,63 @@ jobs:
       contents: write
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       - name: Download all artifacts
         uses: actions/download-artifact@v4
+
+      - name: Generate changelog
+        id: changelog
+        run: |
+          # 获取上一个 tag
+          PREV_TAG=$(git describe --tags --abbrev=0 HEAD^ 2>/dev/null || echo "")
+          if [ -z "$PREV_TAG" ]; then
+            echo "changelog=Initial release" >> $GITHUB_OUTPUT
+          else
+            # 生成 changelog
+            CHANGELOG=$(git log ${PREV_TAG}..HEAD --pretty=format:"- %s (%h)" --no-merges)
+            echo "changelog<<EOF" >> $GITHUB_OUTPUT
+            echo "$CHANGELOG" >> $GITHUB_OUTPUT
+            echo "EOF" >> $GITHUB_OUTPUT
+          fi
 
       - name: Create Release
         uses: softprops/action-gh-release@v1
         with:
           tag_name: ${{ github.ref_name }}
-          name: Myriad Monitor ${{ github.ref_name }}
+          name: v${{ github.ref_name }}
           body: |
-            ## What's New
+            ## 万镜 Myriad ${{ github.ref_name }}
 
-            - TODO: Add release notes
+            去中心化的跨平台系统监控面板
 
-            ## Downloads
+            ## 更新内容
 
-            ### Windows
-            - **Portable**: myriad-monitor-windows-portable.zip
-            - **Installer**: myriad-monitor-windows-installer.exe
+            ${{ steps.changelog.outputs.changelog }}
 
-            ### macOS
-            - **DMG**: myriad-monitor-macos.dmg
+            ## 下载
 
-            ### Linux
-            - **Bundle**: myriad-monitor-linux.tar.gz
+            | 平台 | 文件 | 说明 |
+            |------|------|------|
+            | Windows | `myriad-monitor-windows-portable.zip` | 便携版，解压即用 |
+            | Windows | `myriad-monitor-windows-installer.exe` | 安装包 |
+            | macOS | `myriad-monitor-macos.dmg` | DMG 安装包 |
+            | Linux | `myriad-monitor-linux.tar.gz` | tar.gz 包 |
+            | Android | `app-release.apk` | 正式版 (com.chendusk.myriadmonitor) |
+            | Android | `app-debug.apk` | 测试版 (com.chendusk.myriadmonitor.dev) |
 
-            ### Android
-            - **Release**: app-release.apk (com.chendusk.myriadmonitor)
-            - **Debug**: app-debug.apk (com.chendusk.myriadmonitor.dev)
+            ## 系统要求
+
+            - **Windows**: Windows 10+
+            - **macOS**: macOS 10.15+
+            - **Linux**: X11/Wayland
+            - **Android**: Android 6.0+
+            - **iOS**: iOS 12.0+
+
+            ---
+
+            **Full Changelog**: https://github.com/${{ github.repository }}/compare/${{ steps.changelog.outputs.prev_tag }}...${{ github.ref_name }}
           files: |
             windows-portable/myriad-monitor-windows-portable.zip
             windows-installer/*.exe
@@ -209,5 +237,5 @@ jobs:
             linux-bundle/myriad-monitor-linux.tar.gz
             android-release/app-release.apk
             android-debug/app-debug.apk
-          draft: true
+          draft: false
           prerelease: false
