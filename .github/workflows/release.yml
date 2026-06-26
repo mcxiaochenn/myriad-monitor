@@ -42,12 +42,12 @@ jobs:
         run: |
           & "C:\Program Files (x86)\Inno Setup 6\ISCC.exe" windows\installer.iss
 
-      - uses: actions/upload-artifact@v5
+      - uses: actions/upload-artifact@v7
         with:
           name: windows-portable
           path: myriad-monitor-windows-portable.zip
 
-      - uses: actions/upload-artifact@v5
+      - uses: actions/upload-artifact@v7
         with:
           name: windows-installer
           path: build/windows/installer/*.exe
@@ -82,7 +82,7 @@ jobs:
           echo "Found app at: $APP_PATH"
           hdiutil create -volname "Myriad Monitor" -srcfolder "$APP_PATH" -ov -format UDZO myriad-monitor-macos.dmg
 
-      - uses: actions/upload-artifact@v5
+      - uses: actions/upload-artifact@v7
         with:
           name: macos-dmg
           path: myriad-monitor-macos.dmg
@@ -112,7 +112,7 @@ jobs:
           cd build/linux/x64/release/bundle/
           tar -czf ../../../../../myriad-monitor-linux.tar.gz *
 
-      - uses: actions/upload-artifact@v5
+      - uses: actions/upload-artifact@v7
         with:
           name: linux-bundle
           path: myriad-monitor-linux.tar.gz
@@ -155,12 +155,12 @@ jobs:
       - name: Build debug APK
         run: flutter build apk --debug
 
-      - uses: actions/upload-artifact@v5
+      - uses: actions/upload-artifact@v7
         with:
           name: android-release
           path: build/app/outputs/flutter-apk/app-release.apk
 
-      - uses: actions/upload-artifact@v5
+      - uses: actions/upload-artifact@v7
         with:
           name: android-debug
           path: build/app/outputs/flutter-apk/app-debug.apk
@@ -178,7 +178,7 @@ jobs:
           fetch-depth: 0
 
       - name: Download all artifacts
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v7
 
       - name: Generate changelog
         id: changelog
