@@ -91,6 +91,18 @@ class AppLocalizations {
   String get descending => locale.languageCode == 'zh' ? '降序' : 'Descending';
   String get currentSort => locale.languageCode == 'zh' ? '当前排序' : 'Current sort';
 
+  // ==================== 添加/发现设备 ====================
+
+  String get addDeviceDesc =>
+      locale.languageCode == 'zh' ? '手动输入 IP 地址添加' : 'Manually add by IP address';
+  String get discoverDevice => locale.languageCode == 'zh' ? '发现设备' : 'Discover Devices';
+  String get discoverDeviceDesc =>
+      locale.languageCode == 'zh' ? '搜索局域网内的设备' : 'Search for devices on LAN';
+  String get scanning => locale.languageCode == 'zh' ? '正在扫描...' : 'Scanning...';
+  String get noDevicesFound => locale.languageCode == 'zh' ? '未发现设备' : 'No devices found';
+  String get scanAgain => locale.languageCode == 'zh' ? '重新扫描' : 'Scan again';
+  String get added => locale.languageCode == 'zh' ? '已添加' : 'Added';
+
   // ==================== 设备卡片 ====================
 
   String get online => locale.languageCode == 'zh' ? '在线' : 'Online';

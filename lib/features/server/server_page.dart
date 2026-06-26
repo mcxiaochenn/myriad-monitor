@@ -1,9 +1,64 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import 'package:uuid/uuid.dart';
 import '../../l10n/app_localizations.dart';
-import '../../client/device_manager.dart';
 import '../settings/settings_page.dart';
+
+/// 服务运行状态 Provider
+final serverStatusProvider =
+    StateNotifierProvider<ServerStatusNotifier, ServerStatus>((ref) {
+  return ServerStatusNotifier();
+});
+
+/// 服务状态
+class ServerStatus {
+  final bool isRunning;
+  final int connectedClients;
+
+  ServerStatus({
+    this.isRunning = false,
+    this.connectedClients = 0,
+  });
+
+  ServerStatus copyWith({
+    bool? isRunning,
+    int? connectedClients,
+  }) {
+    return ServerStatus(
+      isRunning: isRunning ?? this.isRunning,
+      connectedClients: connectedClients ?? this.connectedClients,
+    );
+  }
+}
+
+/// 服务状态管理
+class ServerStatusNotifier extends StateNotifier<ServerStatus> {
+  ServerStatusNotifier() : super(ServerStatus());
+
+  void toggleService() {
+    state = state.copyWith(isRunning: !state.isRunning);
+    // TODO: 实际启动/停止 WebSocket 服务
+  }
+
+  void updateClientCount(int count) {
+    state = state.copyWith(connectedClients: count);
+  }
+}
+
+/// 设备 ID Provider
+final deviceIdProvider = FutureProvider<String>((ref) async {
+  final prefs = await SharedPreferences.getInstance();
+  String? deviceId = prefs.getString('device_id');
+
+  if (deviceId == null || deviceId.isEmpty) {
+    deviceId = const Uuid().v4();
+    await prefs.setString('device_id', deviceId);
+  }
+
+  return deviceId;
+});
 
 /// 服务端页面
 ///
@@ -15,6 +70,8 @@ class ServerPage extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final l10n = AppLocalizations.of(context);
     final config = ref.watch(serverConfigProvider);
+    final serverStatus = ref.watch(serverStatusProvider);
+    final deviceIdAsync = ref.watch(deviceIdProvider);
 
     return Scaffold(
       appBar: AppBar(
@@ -24,12 +81,12 @@ class ServerPage extends ConsumerWidget {
       body: ListView(
         children: [
           // 设备信息卡片
-          _buildDeviceInfoCard(context, l10n, config),
+          _buildDeviceInfoCard(context, l10n, config, deviceIdAsync),
 
           const SizedBox(height: 16),
 
           // 服务状态卡片
-          _buildServiceStatusCard(context, l10n, config),
+          _buildServiceStatusCard(context, ref, l10n, config, serverStatus),
 
           const SizedBox(height: 16),
 
@@ -39,7 +96,7 @@ class ServerPage extends ConsumerWidget {
           const SizedBox(height: 16),
 
           // 连接的客户端卡片
-          _buildConnectedClientsCard(context, l10n),
+          _buildConnectedClientsCard(context, l10n, serverStatus),
         ],
       ),
     );
@@ -50,6 +107,7 @@ class ServerPage extends ConsumerWidget {
     BuildContext context,
     AppLocalizations l10n,
     ServerConfig config,
+    AsyncValue<String> deviceIdAsync,
   ) {
     return Card(
       margin: const EdgeInsets.all(16),
@@ -73,8 +131,15 @@ class ServerPage extends ConsumerWidget {
             ),
             const Divider(),
             _buildInfoRow(l10n.deviceNameLabel, config.deviceName),
-            _buildInfoRow(l10n.deviceId, _getDeviceId()),
-            _buildInfoRow(l10n.os, _getOsName()),
+            _buildInfoRow(
+              l10n.deviceId,
+              deviceIdAsync.when(
+                data: (id) => id.substring(0, 8), // 只显示前 8 位
+                loading: () => '...',
+                error: (_, __) => 'error',
+              ),
+            ),
+            _buildInfoRow(l10n.os, _getOsName(l10n)),
             _buildInfoRow(l10n.hostname, _getHostname()),
           ],
         ),
@@ -85,12 +150,11 @@ class ServerPage extends ConsumerWidget {
   /// 构建服务状态卡片
   Widget _buildServiceStatusCard(
     BuildContext context,
+    WidgetRef ref,
     AppLocalizations l10n,
     ServerConfig config,
+    ServerStatus status,
   ) {
-    // TODO: 从实际服务获取状态
-    final isRunning = config.autoStart;
-
     return Card(
       margin: const EdgeInsets.symmetric(horizontal: 16),
       child: Padding(
@@ -114,8 +178,8 @@ class ServerPage extends ConsumerWidget {
             const Divider(),
             _buildStatusRow(
               l10n.websocketService,
-              isRunning,
-              isRunning ? l10n.running : l10n.stopped,
+              status.isRunning,
+              status.isRunning ? l10n.running : l10n.stopped,
             ),
             _buildInfoRow(l10n.serverPort, '${config.port}'),
             _buildInfoRow(l10n.listenAddress, config.address),
@@ -125,10 +189,11 @@ class ServerPage extends ConsumerWidget {
               width: double.infinity,
               child: FilledButton.icon(
                 onPressed: () {
-                  // TODO: 切换服务状态
+                  ref.read(serverStatusProvider.notifier).toggleService();
                 },
-                icon: Icon(isRunning ? Icons.stop : Icons.play_arrow),
-                label: Text(isRunning ? l10n.stopService : l10n.startService),
+                icon: Icon(status.isRunning ? Icons.stop : Icons.play_arrow),
+                label: Text(
+                    status.isRunning ? l10n.stopService : l10n.startService),
               ),
             ),
           ],
@@ -181,10 +246,10 @@ class ServerPage extends ConsumerWidget {
 
   /// 构建连接的客户端卡片
   Widget _buildConnectedClientsCard(
-      BuildContext context, AppLocalizations l10n) {
-    // TODO: 从实际服务获取客户端列表
-    final clientCount = 0;
-
+    BuildContext context,
+    AppLocalizations l10n,
+    ServerStatus status,
+  ) {
     return Card(
       margin: const EdgeInsets.symmetric(horizontal: 16),
       child: Padding(
@@ -206,8 +271,8 @@ class ServerPage extends ConsumerWidget {
               ],
             ),
             const Divider(),
-            _buildInfoRow(l10n.clientCount, '$clientCount'),
-            if (clientCount == 0)
+            _buildInfoRow(l10n.clientCount, '${status.connectedClients}'),
+            if (status.connectedClients == 0)
               Padding(
                 padding: const EdgeInsets.only(top: 8),
                 child: Text(
@@ -279,14 +344,8 @@ class ServerPage extends ConsumerWidget {
     );
   }
 
-  /// 获取设备 ID
-  String _getDeviceId() {
-    // TODO: 从实际服务获取设备 ID
-    return 'auto-generated';
-  }
-
   /// 获取操作系统名称
-  String _getOsName() {
+  String _getOsName(AppLocalizations l10n) {
     if (Platform.isWindows) return 'Windows';
     if (Platform.isMacOS) return 'macOS';
     if (Platform.isLinux) return 'Linux';

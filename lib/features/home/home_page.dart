@@ -141,11 +141,40 @@ class HomePage extends ConsumerWidget {
             onPressed: () => _showSortDialog(context, ref, l10n),
             tooltip: l10n.sortDevices,
           ),
-          // 添加设备按钮
-          IconButton(
+          // 添加/发现设备菜单
+          PopupMenuButton<String>(
             icon: const Icon(Icons.add_circle_outline),
-            onPressed: () => _showAddDeviceDialog(context, ref, l10n),
             tooltip: l10n.addDevice,
+            onSelected: (value) {
+              switch (value) {
+                case 'add':
+                  _showAddDeviceDialog(context, ref, l10n);
+                  break;
+                case 'discover':
+                  _showDiscoveredDevicesDialog(context, ref, l10n);
+                  break;
+              }
+            },
+            itemBuilder: (context) => [
+              PopupMenuItem(
+                value: 'add',
+                child: ListTile(
+                  leading: const Icon(Icons.add),
+                  title: Text(l10n.addDevice),
+                  subtitle: Text(l10n.addDeviceDesc),
+                  contentPadding: EdgeInsets.zero,
+                ),
+              ),
+              PopupMenuItem(
+                value: 'discover',
+                child: ListTile(
+                  leading: const Icon(Icons.search),
+                  title: Text(l10n.discoverDevice),
+                  subtitle: Text(l10n.discoverDeviceDesc),
+                  contentPadding: EdgeInsets.zero,
+                ),
+              ),
+            ],
           ),
         ],
       ),
@@ -320,6 +349,33 @@ class HomePage extends ConsumerWidget {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
               content: Text(l10n.deviceAdded(name)),
+              duration: const Duration(seconds: 2),
+              behavior: SnackBarBehavior.floating,
+            ),
+          );
+        },
+        l10n: l10n,
+      ),
+    );
+  }
+
+  /// 显示已发现设备对话框
+  void _showDiscoveredDevicesDialog(
+      BuildContext context, WidgetRef ref, AppLocalizations l10n) {
+    // 获取已发现但未添加的设备
+    final discoveryIntegration = ref.read(discoveryIntegrationProvider);
+    final existingDevices = ref.read(deviceListProvider);
+
+    showDialog(
+      context: context,
+      builder: (context) => _DiscoveredDevicesDialog(
+        discoveryIntegration: discoveryIntegration,
+        existingDevices: existingDevices,
+        onAdd: (device) {
+          ref.read(deviceListProvider.notifier).addDevice(device);
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(l10n.deviceAdded(device.name)),
               duration: const Duration(seconds: 2),
               behavior: SnackBarBehavior.floating,
             ),
@@ -596,6 +652,171 @@ class _AddDeviceDialogState extends State<_AddDeviceDialog> {
             }
           },
           child: Text(widget.l10n.add),
+        ),
+      ],
+    );
+  }
+}
+
+/// 已发现设备对话框
+class _DiscoveredDevicesDialog extends StatefulWidget {
+  final DiscoveryIntegration discoveryIntegration;
+  final List<ManagedDevice> existingDevices;
+  final Function(ManagedDevice) onAdd;
+  final AppLocalizations l10n;
+
+  const _DiscoveredDevicesDialog({
+    required this.discoveryIntegration,
+    required this.existingDevices,
+    required this.onAdd,
+    required this.l10n,
+  });
+
+  @override
+  State<_DiscoveredDevicesDialog> createState() =>
+      _DiscoveredDevicesDialogState();
+}
+
+class _DiscoveredDevicesDialogState extends State<_DiscoveredDevicesDialog> {
+  final List<DiscoveryMessage> _discoveredDevices = [];
+  bool _isScanning = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _startScanning();
+  }
+
+  void _startScanning() {
+    setState(() {
+      _isScanning = true;
+      _discoveredDevices.clear();
+    });
+
+    // 监听设备发现事件
+    widget.discoveryIntegration.onDeviceDiscovered.listen((message) {
+      if (mounted) {
+        setState(() {
+          // 避免重复添加
+          if (!_discoveredDevices
+              .any((d) => d.deviceId == message.deviceId)) {
+            _discoveredDevices.add(message);
+          }
+        });
+      }
+    });
+
+    // 10 秒后停止扫描
+    Future.delayed(const Duration(seconds: 10), () {
+      if (mounted) {
+        setState(() {
+          _isScanning = false;
+        });
+      }
+    });
+  }
+
+  bool _isDeviceAdded(String deviceId) {
+    return widget.existingDevices.any((d) => d.deviceId == deviceId);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      title: Row(
+        children: [
+          Text(widget.l10n.discoverDevice),
+          if (_isScanning) ...[
+            const SizedBox(width: 8),
+            const SizedBox(
+              width: 16,
+              height: 16,
+              child: CircularProgressIndicator(strokeWidth: 2),
+            ),
+          ],
+        ],
+      ),
+      content: SizedBox(
+        width: double.maxFinite,
+        height: 300,
+        child: _discoveredDevices.isEmpty
+            ? Center(
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Icon(
+                      Icons.search,
+                      size: 48,
+                      color: Theme.of(context)
+                          .colorScheme
+                          .onSurfaceVariant
+                          .withValues(alpha: 0.4),
+                    ),
+                    const SizedBox(height: 16),
+                    Text(
+                      _isScanning
+                          ? widget.l10n.scanning
+                          : widget.l10n.noDevicesFound,
+                      style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+                            color: Theme.of(context)
+                                .colorScheme
+                                .onSurfaceVariant,
+                          ),
+                    ),
+                    if (!_isScanning) ...[
+                      const SizedBox(height: 8),
+                      TextButton(
+                        onPressed: _startScanning,
+                        child: Text(widget.l10n.scanAgain),
+                      ),
+                    ],
+                  ],
+                ),
+              )
+            : ListView.builder(
+                itemCount: _discoveredDevices.length,
+                itemBuilder: (context, index) {
+                  final device = _discoveredDevices[index];
+                  final isAdded = _isDeviceAdded(device.deviceId);
+
+                  return ListTile(
+                    leading: Icon(
+                      Icons.devices,
+                      color: Theme.of(context).colorScheme.primary,
+                    ),
+                    title: Text(device.deviceName),
+                    subtitle: Text('${device.ip}:${device.port}'),
+                    trailing: isAdded
+                        ? Chip(
+                            label: Text(widget.l10n.added),
+                            backgroundColor: Theme.of(context)
+                                .colorScheme
+                                .surfaceContainerHighest,
+                          )
+                        : FilledButton(
+                            onPressed: () {
+                              final newDevice = ManagedDevice(
+                                deviceId: device.deviceId,
+                                name: device.deviceName,
+                                ipAddress: device.ip,
+                                port: device.port,
+                                onlineStatus: DeviceOnlineStatus.online,
+                                discoveredAt: DateTime.now(),
+                                lastSeenAt: DateTime.now(),
+                              );
+                              widget.onAdd(newDevice);
+                              Navigator.pop(context);
+                            },
+                            child: Text(widget.l10n.add),
+                          ),
+                  );
+                },
+              ),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(context),
+          child: Text(widget.l10n.close),
         ),
       ],
     );
