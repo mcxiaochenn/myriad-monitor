@@ -1,10 +1,11 @@
 /// UDP 多播设备发现实现
 ///
-/// 基于 `dart:io` 的 `RawDatagramSocket` 实现局域网设备自动发现。
-/// 使用 SSDP 风格的多播地址 `239.255.255.250:1900` 进行设备间通信。
+/// 基于 LocalSend 协议的设备发现机制：
+/// - 使用多播组 224.0.0.0/24（兼容 Android 设备）
+/// - UDP 端口 53317 进行设备发现
 ///
 /// 工作流程：
-/// 1. 启动时加入多播组，每 5 秒发送一次 announce 公告（共 3 次）
+/// 1. 启动时加入多播组，每 3 秒发送一次 announce 公告（共 5 次）
 /// 2. 切换为每 30 秒发送一次心跳，维持在线状态
 /// 3. 持续监听多播地址，接收其他设备的广播消息
 /// 4. 对收到的心跳消息自动回复 heartbeat_ack
@@ -12,8 +13,10 @@
 library;
 
 import 'dart:async';
+import 'dart:convert';
 import 'dart:io';
 
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:uuid/uuid.dart';
 
 import 'discovery_message.dart';
@@ -23,17 +26,17 @@ import 'discovery_service.dart';
 ///
 /// 实现 [DiscoveryService] 接口，通过 UDP 多播协议实现设备自动发现。
 class UdpDiscoveryService implements DiscoveryService {
-  /// 多播组地址
-  static const String _multicastAddress = '239.255.255.250';
+  /// 多播组地址（LocalSend 使用 224.0.0.0/24 兼容 Android）
+  static const String _multicastAddress = '224.0.0.0';
 
-  /// 多播端口号
-  static const int _multicastPort = 1900;
+  /// 多播端口号（LocalSend 默认端口）
+  static const int _multicastPort = 53317;
 
-  /// 启动阶段公告间隔（毫秒），每 5 秒一次
-  static const int _announceIntervalMs = 5000;
+  /// 启动阶段公告间隔（毫秒），每 3 秒一次
+  static const int _announceIntervalMs = 3000;
 
   /// 启动阶段公告次数
-  static const int _announceCount = 3;
+  static const int _announceCount = 5;
 
   /// 正常运行时心跳间隔（毫秒），每 30 秒一次
   static const int _heartbeatIntervalMs = 30000;
@@ -44,7 +47,7 @@ class UdpDiscoveryService implements DiscoveryService {
   /// 离线检测定时检查间隔（毫秒）
   static const int _offlineCheckIntervalMs = 10000;
 
-  /// 本机设备唯一标识符
+  /// 本机设备唯一标识符（持久化存储）
   late final String _deviceId;
 
   /// 本机设备显示名称
@@ -84,13 +87,16 @@ class UdpDiscoveryService implements DiscoveryService {
   ///
   /// [deviceName] 本机设备名称，用于在局域网中标识本设备
   /// [servicePort] 本机服务端口号，其他设备连接时使用
-  /// [deviceId] 可选的设备 ID，不传则自动生成 UUID v4
   UdpDiscoveryService({
     required this.deviceName,
     required this.servicePort,
-    String? deviceId,
-  }) {
-    _deviceId = deviceId ?? const Uuid().v4();
+  });
+
+  /// 初始化设备 ID（从持久化存储加载或生成新的）
+  Future<void> _initDeviceId() async {
+    final prefs = await SharedPreferences.getInstance();
+    _deviceId = prefs.getString('device_id') ?? const Uuid().v4();
+    await prefs.setString('device_id', _deviceId);
   }
 
   /// 本机设备 ID
@@ -109,6 +115,9 @@ class UdpDiscoveryService implements DiscoveryService {
     _isRunning = true;
 
     try {
+      // 初始化设备 ID
+      await _initDeviceId();
+
       // 绑定到多播端口，允许端口复用
       _socket = await RawDatagramSocket.bind(
         InternetAddress.anyIPv4,
@@ -124,13 +133,17 @@ class UdpDiscoveryService implements DiscoveryService {
       // 开始监听数据包
       _socket!.listen(_onDataReceived);
 
-      // 启动公告阶段：每 5 秒发送一次，共 3 次
+      // 启动公告阶段
       _startAnnouncePhase();
 
       // 启动离线检测
       _startOfflineDetection();
+
+      print('[Discovery] 服务已启动，设备 ID: $_deviceId');
+      print('[Discovery] 多播地址: $_multicastAddress:$_multicastPort');
     } catch (e) {
       _isRunning = false;
+      print('[Discovery] 启动失败: $e');
       rethrow;
     }
   }
@@ -157,6 +170,8 @@ class UdpDiscoveryService implements DiscoveryService {
     // 关闭事件流
     _deviceDiscoveredController.close();
     _deviceLostController.close();
+
+    print('[Discovery] 服务已停止');
   }
 
   /// 获取本机局域网 IP 地址
@@ -184,11 +199,13 @@ class UdpDiscoveryService implements DiscoveryService {
 
   /// 获取当前操作系统标识
   ///
-  /// 返回小写的操作系统名称：windows / macos / linux / unknown
+  /// 返回小写的操作系统名称：windows / macos / linux / android / ios
   String _getOsName() {
     if (Platform.isWindows) return 'windows';
     if (Platform.isMacOS) return 'macos';
     if (Platform.isLinux) return 'linux';
+    if (Platform.isAndroid) return 'android';
+    if (Platform.isIOS) return 'ios';
     return 'unknown';
   }
 
@@ -213,20 +230,22 @@ class UdpDiscoveryService implements DiscoveryService {
     if (_socket == null) return;
 
     try {
-      final data = message.toJsonString().codeUnits;
+      final data = utf8.encode(message.toJsonString());
       _socket!.send(
         data,
         InternetAddress(_multicastAddress),
         _multicastPort,
       );
-    } catch (_) {
-      // 发送失败静默忽略，避免因网络抦动导致服务中断
+      print('[Discovery] 发送 ${message.type} 到 $_multicastAddress:$_multicastPort');
+    } catch (e) {
+      // 发送失败静默忽略，避免因网络波动导致服务中断
+      print('[Discovery] 发送失败: $e');
     }
   }
 
   /// 启动公告阶段
   ///
-  /// 每 5 秒发送一次 announce 公告，共发送 3 次。
+  /// 每 3 秒发送一次 announce 公告，共发送 5 次。
   /// 公告完成后自动切换到心跳阶段。
   void _startAnnouncePhase() {
     _announceSentCount = 0;
@@ -306,6 +325,7 @@ class UdpDiscoveryService implements DiscoveryService {
         os: '',
         timestamp: now,
       ));
+      print('[Discovery] 设备离线: $deviceId');
     }
   }
 
@@ -317,11 +337,13 @@ class UdpDiscoveryService implements DiscoveryService {
     if (datagram == null) return;
 
     try {
-      final messageString = String.fromCharCodes(datagram.data);
+      final messageString = utf8.decode(datagram.data);
       final message = DiscoveryMessage.fromJsonString(messageString);
 
       // 忽略自己发送的消息
       if (message.deviceId == _deviceId) return;
+
+      print('[Discovery] 收到 ${message.type} 来自 ${message.deviceName} (${message.ip})');
 
       // 更新设备最后在线时间
       _deviceLastSeen[message.deviceId] = DateTime.now().millisecondsSinceEpoch;
@@ -342,8 +364,9 @@ class UdpDiscoveryService implements DiscoveryService {
           // 收到心跳确认，仅更新在线时间（已在上方处理）
           break;
       }
-    } catch (_) {
+    } catch (e) {
       // 解析失败的消息静默忽略，可能是非本协议的数据包
+      print('[Discovery] 解析消息失败: $e');
     }
   }
 
@@ -353,4 +376,3 @@ class UdpDiscoveryService implements DiscoveryService {
     _sendMulticast(message);
   }
 }
-
