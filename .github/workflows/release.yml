@@ -16,7 +16,7 @@ jobs:
     name: Build Windows
     runs-on: windows-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
       - uses: subosito/flutter-action@v2
         with:
@@ -42,22 +42,23 @@ jobs:
         run: |
           & "C:\Program Files (x86)\Inno Setup 6\ISCC.exe" windows\installer.iss
 
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v5
         with:
           name: windows-portable
           path: myriad-monitor-windows-portable.zip
 
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v5
         with:
           name: windows-installer
           path: build/windows/installer/*.exe
+          if-no-files-found: warn
 
   # macOS 构建（DMG 安装包）
   build-macos:
     name: Build macOS
-    runs-on: macos-latest
+    runs-on: macos-15
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
       - uses: subosito/flutter-action@v2
         with:
@@ -81,7 +82,7 @@ jobs:
           echo "Found app at: $APP_PATH"
           hdiutil create -volname "Myriad Monitor" -srcfolder "$APP_PATH" -ov -format UDZO myriad-monitor-macos.dmg
 
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v5
         with:
           name: macos-dmg
           path: myriad-monitor-macos.dmg
@@ -91,7 +92,7 @@ jobs:
     name: Build Linux
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
       - uses: subosito/flutter-action@v2
         with:
@@ -111,7 +112,7 @@ jobs:
           cd build/linux/x64/release/bundle/
           tar -czf ../../../../../myriad-monitor-linux.tar.gz *
 
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v5
         with:
           name: linux-bundle
           path: myriad-monitor-linux.tar.gz
@@ -121,9 +122,9 @@ jobs:
     name: Build Android
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
-      - uses: actions/setup-java@v4
+      - uses: actions/setup-java@v5
         with:
           distribution: 'zulu'
           java-version: '17'
@@ -154,12 +155,12 @@ jobs:
       - name: Build debug APK
         run: flutter build apk --debug
 
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v5
         with:
           name: android-release
           path: build/app/outputs/flutter-apk/app-release.apk
 
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v5
         with:
           name: android-debug
           path: build/app/outputs/flutter-apk/app-debug.apk
@@ -172,7 +173,7 @@ jobs:
     permissions:
       contents: write
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
         with:
           fetch-depth: 0
 
@@ -195,7 +196,7 @@ jobs:
           fi
 
       - name: Create Release
-        uses: softprops/action-gh-release@v1
+        uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ github.ref_name }}
           name: v${{ github.ref_name }}
