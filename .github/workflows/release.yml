@@ -231,7 +231,7 @@ jobs:
 
             ---
 
-            **Full Changelog**: https://github.com/${{ github.repository }}/compare/${{ steps.changelog.outputs.prev_tag }}...${{ github.ref_name }}
+            **Full Changelog**: https://github.com/${{ github.repository }}/commits/${{ github.ref_name }}
           files: |
             windows-portable/myriad-monitor-windows-portable.zip
             windows-installer/*.exe
