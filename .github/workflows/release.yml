@@ -185,6 +185,7 @@ jobs:
         run: |
           # 获取上一个 tag
           PREV_TAG=$(git describe --tags --abbrev=0 HEAD^ 2>/dev/null || echo "")
+          echo "prev_tag=$PREV_TAG" >> $GITHUB_OUTPUT
           if [ -z "$PREV_TAG" ]; then
             echo "changelog=Initial release" >> $GITHUB_OUTPUT
           else
@@ -199,7 +200,7 @@ jobs:
         uses: softprops/action-gh-release@v3
         with:
           tag_name: ${{ github.ref_name }}
-          name: v${{ github.ref_name }}
+          name: ${{ github.ref_name }}
           body: |
             ## 万镜 Myriad ${{ github.ref_name }}
 
