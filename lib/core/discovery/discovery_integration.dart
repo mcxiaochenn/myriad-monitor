@@ -35,6 +35,10 @@ class DiscoveryIntegration {
   })  : _discoveryService = discoveryService,
         _deviceManager = deviceManager;
 
+  /// 设备发现事件流（暴露给外部使用）
+  Stream<DiscoveryMessage> get onDeviceDiscovered =>
+      _discoveryService.onDeviceDiscovered;
+
   /// 启动集成服务
   ///
   /// 开始监听设备发现和离线事件，并将它们转发给设备管理器。
