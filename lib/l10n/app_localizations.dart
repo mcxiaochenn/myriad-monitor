@@ -244,6 +244,35 @@ class AppLocalizations {
   String get developer => locale.languageCode == 'zh' ? '开发者' : 'Developer';
   String get openSourceLicense =>
       locale.languageCode == 'zh' ? '开源许可' : 'Open Source License';
+  String get aboutSoftware =>
+      locale.languageCode == 'zh' ? '关于本软件' : 'About Software';
+  String get blog => locale.languageCode == 'zh' ? '博客' : 'Blog';
+
+  // ==================== 服务端页面 ====================
+
+  String get navServer => locale.languageCode == 'zh' ? '服务端' : 'Server';
+  String get deviceInfo => locale.languageCode == 'zh' ? '设备信息' : 'Device Info';
+  String get deviceId => locale.languageCode == 'zh' ? '设备 ID' : 'Device ID';
+  String get os => locale.languageCode == 'zh' ? '操作系统' : 'OS';
+  String get hostname => locale.languageCode == 'zh' ? '主机名' : 'Hostname';
+  String get serviceStatus => locale.languageCode == 'zh' ? '服务状态' : 'Service Status';
+  String get websocketService => locale.languageCode == 'zh' ? 'WebSocket 服务' : 'WebSocket Service';
+  String get running => locale.languageCode == 'zh' ? '运行中' : 'Running';
+  String get stopped => locale.languageCode == 'zh' ? '已停止' : 'Stopped';
+  String get startService => locale.languageCode == 'zh' ? '启动服务' : 'Start Service';
+  String get stopService => locale.languageCode == 'zh' ? '停止服务' : 'Stop Service';
+  String get networkInfo => locale.languageCode == 'zh' ? '网络信息' : 'Network Info';
+  String get detecting => locale.languageCode == 'zh' ? '检测中...' : 'Detecting...';
+  String get connectedClients => locale.languageCode == 'zh' ? '已连接的客户端' : 'Connected Clients';
+  String get clientCount => locale.languageCode == 'zh' ? '客户端数量' : 'Client Count';
+  String get noClients => locale.languageCode == 'zh' ? '暂无客户端连接' : 'No clients connected';
+
+  // ==================== 关于本软件 ====================
+
+  String get appMeaning =>
+      locale.languageCode == 'zh' ?
+      '取"万物皆可观、镜照万千端"之意。每台设备是一面镜子，互相映照，无需中心。' :
+      '"Myriad" means countless mirrors reflecting each other. Every device is a mirror, reflecting thousands of endpoints, no center needed.';
 
   // ==================== 设备详情页 ====================
 
