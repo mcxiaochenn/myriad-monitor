@@ -5,8 +5,16 @@
 **去中心化的跨平台系统监控面板，设备间 IP 直连，一端采集一端渲染。**
 
 <p align="left">
+  <a href="README.md"><img src="https://img.shields.io/badge/中文-README-blue" alt="中文"></a>
+  <a href="README_EN.md"><img src="https://img.shields.io/badge/English-README-blue" alt="English"></a>
+</p>
+
+<p align="left">
   <img src="https://img.shields.io/github/license/mcxiaochenn/myriad-monitor" alt="License">
+  <img src="https://img.shields.io/github/v/release/mcxiaochenn/myriad-monitor" alt="Release">
+  <img src="https://img.shields.io/github/actions/workflow/status/mcxiaochenn/myriad-monitor/build.yml?label=CI" alt="Build">
   <img src="https://img.shields.io/badge/Flutter-3.x-blue" alt="Flutter">
+  <img src="https://img.shields.io/badge/Dart-3.x-0175C2" alt="Dart">
   <img src="https://img.shields.io/badge/Platform-Windows%20%7C%20macOS%20%7C%20Linux%20%7C%20Android%20%7C%20iOS-lightgrey" alt="Platform">
   <img src="https://img.shields.io/badge/Language-中文%20%7C%20English-green" alt="Language">
 </p>
@@ -85,8 +93,7 @@
 ## 快速开始
 
 **环境要求**
-- Flutter 3.x
-- Dart 3.x
+- Flutter 3.x / Dart 3.x
 - 桌面端: Windows 10+ / macOS 10.15+ / Linux (X11/Wayland)
 - 移动端: Android 6.0+ / iOS 12.0+
 
@@ -111,13 +118,61 @@ flutter run -d ios        # iOS
 
 ```bash
 # 桌面端
-flutter build windows
-flutter build macos
-flutter build linux
+flutter build windows     # Windows (便携版)
+flutter build macos       # macOS (DMG)
+flutter build linux       # Linux (tar.gz)
 
 # 移动端
 flutter build apk         # Android APK
 flutter build ios         # iOS
+```
+
+## 下载
+
+前往 [Releases](https://github.com/mcxiaochenn/myriad-monitor/releases) 页面下载最新版本：
+
+| 平台 | 格式 | 说明 |
+|------|------|------|
+| Windows | `.exe` 安装包 | 标准安装 |
+| Windows | `.zip` 便携版 | 解压即用 |
+| macOS | `.dmg` | DMG 安装包 |
+| Linux | `.tar.gz` | tar.gz 包 |
+| Android | `.apk` | 正式版 / 测试版 |
+
+## 项目结构
+
+```
+lib/
+├── app/                    # 应用配置
+│   └── app.dart           # 主题配置
+├── core/                   # 核心模块
+│   ├── constants.dart     # 常量定义
+│   ├── discovery/         # 设备发现
+│   │   ├── udp_discovery.dart
+│   │   ├── discovery_service.dart
+│   │   └── discovery_integration.dart
+│   ├── models/            # 数据模型
+│   │   ├── device_info.dart
+│   │   └── system_metrics.dart
+│   └── storage/           # 本地存储
+│       ├── device_storage.dart
+│       └── settings_storage.dart
+├── client/                 # 客户端模块
+│   ├── client_service.dart
+│   └── device_manager.dart
+├── server/                 # 服务端模块
+│   ├── server_service.dart
+│   ├── system_info_collector.dart
+│   └── windows_collector.dart
+├── features/               # 功能页面
+│   ├── home/              # 主页
+│   ├── detail/            # 设备详情
+│   ├── server/            # 服务端状态
+│   ├── settings/          # 设置
+│   └── about/             # 关于
+└── l10n/                   # 国际化
+    ├── app_localizations.dart
+    └── locale_provider.dart
 ```
 
 ## Roadmap
@@ -133,6 +188,7 @@ flutter build ios         # iOS
 - [x] 国际化支持（中文/英文）
 - [x] 服务端配置页面
 - [x] 关于页面
+- [x] 设备数据持久化
 - [ ] 系统信息采集（macOS/Linux/Android/iOS 平台）
 - [ ] 设备详情页数据对接
 - [ ] 历史数据存储和图表
@@ -143,9 +199,11 @@ flutter build ios         # iOS
 
 1. Fork 本仓库
 2. 创建特性分支 (`git checkout -b feature/xxx`)
-3. 提交更改 (`git commit -m 'Add xxx'`)
+3. 提交更改 (`git commit -m 'feat: Add xxx'`)
 4. 推送分支 (`git push origin feature/xxx`)
 5. 打开 Pull Request
+
+请遵循 [Conventional Commits](https://www.conventionalcommits.org/) 规范提交代码。
 
 ## 许可证
 
