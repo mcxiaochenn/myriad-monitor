@@ -42,9 +42,9 @@ class DiscoveryIntegration {
   /// 启动集成服务
   ///
   /// 开始监听设备发现和离线事件，并将它们转发给设备管理器。
-  void start() {
+  Future<void> start() async {
     // 启动设备发现服务
-    _discoveryService.start();
+    await _discoveryService.start();
 
     // 监听设备发现事件
     _subscriptions.add(

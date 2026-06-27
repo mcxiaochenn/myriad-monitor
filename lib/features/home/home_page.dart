@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -7,11 +8,13 @@ import '../../core/discovery/udp_discovery.dart';
 import '../../core/discovery/discovery_integration.dart';
 import '../../l10n/app_localizations.dart';
 import '../settings/settings_page.dart';
+import '../detail/detail_page.dart';
 import 'device_card.dart';
 
 /// 设备管理器 Provider
 final deviceManagerProvider = Provider<DeviceManager>((ref) {
   final manager = DeviceManager();
+  manager.loadDevices();
   manager.startOfflineDetection();
   ref.onDispose(() => manager.dispose());
   return manager;
@@ -33,7 +36,10 @@ final discoveryIntegrationProvider = Provider<DiscoveryIntegration>((ref) {
   );
 
   integration.start();
-  ref.onDispose(() => integration.dispose());
+  ref.onDispose(() {
+    discoveryService.dispose();
+    integration.dispose();
+  });
   return integration;
 });
 
@@ -97,14 +103,19 @@ final deviceListProvider =
 /// 设备列表状态管理
 class DeviceListNotifier extends StateNotifier<List<ManagedDevice>> {
   final DeviceManager _manager;
+  final List<StreamSubscription> _subscriptions = [];
 
   DeviceListNotifier(this._manager) : super(_manager.devices) {
-    _manager.devicesChangedStream.listen((devices) {
-      state = List.unmodifiable(devices);
-    });
-    _manager.deviceStatusStream.listen((_) {
-      state = List.unmodifiable(_manager.devices);
-    });
+    _subscriptions.add(
+      _manager.devicesChangedStream.listen((devices) {
+        state = List.unmodifiable(devices);
+      }),
+    );
+    _subscriptions.add(
+      _manager.deviceStatusStream.listen((_) {
+        state = List.unmodifiable(_manager.devices);
+      }),
+    );
   }
 
   void addDevice(ManagedDevice device) {
@@ -115,6 +126,14 @@ class DeviceListNotifier extends StateNotifier<List<ManagedDevice>> {
   void removeDevice(String deviceId) {
     _manager.removeDevice(deviceId);
     state = List.unmodifiable(_manager.devices);
+  }
+
+  @override
+  void dispose() {
+    for (final sub in _subscriptions) {
+      sub.cancel();
+    }
+    super.dispose();
   }
 }
 
@@ -534,11 +553,12 @@ class HomePage extends ConsumerWidget {
   /// 导航到设备详情页
   void _navigateToDetail(
       BuildContext context, ManagedDevice device, AppLocalizations l10n) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(l10n.openingDevice(device.name)),
-        duration: const Duration(seconds: 1),
-        behavior: SnackBarBehavior.floating,
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => DeviceDetailPage(
+          deviceName: device.name,
+          deviceIp: device.ipAddress,
+        ),
       ),
     );
   }
@@ -681,11 +701,18 @@ class _DiscoveredDevicesDialog extends StatefulWidget {
 class _DiscoveredDevicesDialogState extends State<_DiscoveredDevicesDialog> {
   final List<DiscoveryMessage> _discoveredDevices = [];
   bool _isScanning = false;
+  StreamSubscription? _discoverySubscription;
 
   @override
   void initState() {
     super.initState();
     _startScanning();
+  }
+
+  @override
+  void dispose() {
+    _discoverySubscription?.cancel();
+    super.dispose();
   }
 
   void _startScanning() {
@@ -694,8 +721,12 @@ class _DiscoveredDevicesDialogState extends State<_DiscoveredDevicesDialog> {
       _discoveredDevices.clear();
     });
 
+    // 取消之前的订阅，避免重复监听
+    _discoverySubscription?.cancel();
+
     // 监听设备发现事件
-    widget.discoveryIntegration.onDeviceDiscovered.listen((message) {
+    _discoverySubscription =
+        widget.discoveryIntegration.onDeviceDiscovered.listen((message) {
       if (mounted) {
         setState(() {
           // 避免重复添加

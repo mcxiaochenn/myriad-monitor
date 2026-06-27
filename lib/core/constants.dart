@@ -6,10 +6,10 @@ library;
 /// 网络相关常量
 class NetworkConstants {
   /// WebSocket 默认端口号
-  static const int defaultWebSocketPort = 8080;
+  static const int defaultWebSocketPort = 19190;
 
   /// HTTP 服务默认端口号
-  static const int defaultHttpPort = 8081;
+  static const int defaultHttpPort = 19191;
 
   /// WebSocket 连接超时时间（秒）
   static const int connectionTimeoutSeconds = 10;

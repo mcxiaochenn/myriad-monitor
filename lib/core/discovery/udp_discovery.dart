@@ -16,6 +16,7 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 
+import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:uuid/uuid.dart';
 
@@ -110,7 +111,7 @@ class UdpDiscoveryService implements DiscoveryService {
   Stream<DiscoveryMessage> get onDeviceLost => _deviceLostController.stream;
 
   @override
-  void start() async {
+  Future<void> start() async {
     if (_isRunning) return;
     _isRunning = true;
 
@@ -139,11 +140,11 @@ class UdpDiscoveryService implements DiscoveryService {
       // 启动离线检测
       _startOfflineDetection();
 
-      print('[Discovery] 服务已启动，设备 ID: $_deviceId');
-      print('[Discovery] 多播地址: $_multicastAddress:$_multicastPort');
+      debugPrint('[Discovery] 服务已启动，设备 ID: $_deviceId');
+      debugPrint('[Discovery] 多播地址: $_multicastAddress:$_multicastPort');
     } catch (e) {
       _isRunning = false;
-      print('[Discovery] 启动失败: $e');
+      debugPrint('[Discovery] 启动失败: $e');
       rethrow;
     }
   }
@@ -167,11 +168,16 @@ class UdpDiscoveryService implements DiscoveryService {
     // 清空设备记录
     _deviceLastSeen.clear();
 
-    // 关闭事件流
+    debugPrint('[Discovery] 服务已停止');
+  }
+
+  /// 释放所有资源（包括 StreamController）
+  ///
+  /// 调用后实例不可再使用，需创建新实例。
+  void dispose() {
+    stop();
     _deviceDiscoveredController.close();
     _deviceLostController.close();
-
-    print('[Discovery] 服务已停止');
   }
 
   /// 获取本机局域网 IP 地址
@@ -236,10 +242,10 @@ class UdpDiscoveryService implements DiscoveryService {
         InternetAddress(_multicastAddress),
         _multicastPort,
       );
-      print('[Discovery] 发送 ${message.type} 到 $_multicastAddress:$_multicastPort');
+      debugPrint('[Discovery] 发送 ${message.type} 到 $_multicastAddress:$_multicastPort');
     } catch (e) {
       // 发送失败静默忽略，避免因网络波动导致服务中断
-      print('[Discovery] 发送失败: $e');
+      debugPrint('[Discovery] 发送失败: $e');
     }
   }
 
@@ -325,7 +331,7 @@ class UdpDiscoveryService implements DiscoveryService {
         os: '',
         timestamp: now,
       ));
-      print('[Discovery] 设备离线: $deviceId');
+      debugPrint('[Discovery] 设备离线: $deviceId');
     }
   }
 
@@ -343,7 +349,7 @@ class UdpDiscoveryService implements DiscoveryService {
       // 忽略自己发送的消息
       if (message.deviceId == _deviceId) return;
 
-      print('[Discovery] 收到 ${message.type} 来自 ${message.deviceName} (${message.ip})');
+      debugPrint('[Discovery] 收到 ${message.type} 来自 ${message.deviceName} (${message.ip})');
 
       // 更新设备最后在线时间
       _deviceLastSeen[message.deviceId] = DateTime.now().millisecondsSinceEpoch;
@@ -366,7 +372,7 @@ class UdpDiscoveryService implements DiscoveryService {
       }
     } catch (e) {
       // 解析失败的消息静默忽略，可能是非本协议的数据包
-      print('[Discovery] 解析消息失败: $e');
+      debugPrint('[Discovery] 解析消息失败: $e');
     }
   }
 

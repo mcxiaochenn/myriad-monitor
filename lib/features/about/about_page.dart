@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
+import '../../core/constants.dart';
 import '../../l10n/app_localizations.dart';
 
 /// 关于页面
@@ -51,7 +52,7 @@ class AboutPage extends StatelessWidget {
                 const SizedBox(height: 4),
                 // 版本号
                 Text(
-                  'v1.0.0',
+                  'v${AppConfigConstants.appVersion}',
                   style: theme.textTheme.bodyMedium?.copyWith(
                     color: colorScheme.onSurfaceVariant,
                   ),

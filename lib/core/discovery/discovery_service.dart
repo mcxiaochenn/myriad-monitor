@@ -15,7 +15,7 @@ abstract class DiscoveryService {
   ///
   /// 开始广播本设备信息并监听局域网内其他设备的广播。
   /// 启动后会发送 announce 公告，随后进入心跳循环。
-  void start();
+  Future<void> start();
 
   /// 停止设备发现服务
   ///

@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:flutter/foundation.dart';
 
+import '../core/storage/device_storage.dart';
 import 'client_service.dart';
 
 /// 设备在线状态枚举
@@ -125,6 +126,12 @@ class DeviceManager {
 
   /// 离线检测间隔（秒）
   static const int _offlineCheckInterval = 10;
+
+  /// 设备存储服务
+  final DeviceStorage _storage = DeviceStorage();
+
+  /// 是否正在加载中（加载时跳过自动保存）
+  bool _isLoading = false;
 
   /// 设备管理器构造函数
   DeviceManager();
@@ -345,23 +352,35 @@ class DeviceManager {
   }
 
   // ---------------------------------------------------------------------------
-  // 持久化（预留接口）
+  // 持久化
   // ---------------------------------------------------------------------------
 
   /// 将设备列表保存到本地存储
-  ///
-  /// TODO: 实现持久化存储（使用 Hive 或 SharedPreferences）
   Future<void> saveDevices() async {
-    // TODO: 将 _devices 序列化后写入本地存储
-    debugPrint('[DeviceManager] saveDevices() - 待实现');
+    try {
+      await _storage.saveDevices(devices);
+      debugPrint('[DeviceManager] 设备列表已保存，共 ${_devices.length} 台');
+    } catch (e) {
+      debugPrint('[DeviceManager] 保存设备列表失败: $e');
+    }
   }
 
   /// 从本地存储加载设备列表
-  ///
-  /// TODO: 实现从持久化存储读取
   Future<void> loadDevices() async {
-    // TODO: 从本地存储反序列化并填充 _devices
-    debugPrint('[DeviceManager] loadDevices() - 待实现');
+    _isLoading = true;
+    try {
+      final loaded = await _storage.loadDevices();
+      _devices.clear();
+      for (final device in loaded) {
+        _devices[device.deviceId] = device;
+      }
+      _notifyDevicesChanged();
+      debugPrint('[DeviceManager] 设备列表已加载，共 ${_devices.length} 台');
+    } catch (e) {
+      debugPrint('[DeviceManager] 加载设备列表失败: $e');
+    } finally {
+      _isLoading = false;
+    }
   }
 
   // ---------------------------------------------------------------------------
@@ -372,6 +391,10 @@ class DeviceManager {
   void _notifyDevicesChanged() {
     if (!_devicesChangedController.isClosed) {
       _devicesChangedController.add(devices);
+    }
+    // 加载时跳过自动保存，避免循环
+    if (!_isLoading) {
+      saveDevices();
     }
   }
 

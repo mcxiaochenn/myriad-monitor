@@ -13,127 +13,87 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 **Myriad (万镜)** — 去中心化的跨平台系统监控面板。设备间通过 IP 直连，每个实例既是 Server（采集数据）又是 Client（展示数据），无需中心服务器。
 
-## 技术栈
-
-- **框架**: Flutter 3.x (全平台: Windows / macOS / Linux / Android / iOS)
-- **状态管理**: Riverpod
-- **系统信息采集**: `system_info2` / `dart:ffi`
-- **设备间通信**: WebSocket (`shelf` + `web_socket_channel`)
-- **设备发现**: UDP 多播 (`dart:io` RawDatagramSocket)
-- **图表渲染**: `fl_chart`
-- **高斯模糊**: `BackdropFilter` + `ImageFilter.blur`
-- **本地存储**: `hive` / `shared_preferences`
-- **国际化**: 自定义 `AppLocalizations` (中文/英文)
-
 ## 常用命令
 
 Flutter 路径：`D:\flutter\bin`
 
 ```bash
-# 安装依赖
-flutter pub get
-
-# 运行应用
-flutter run -d windows    # Windows
-flutter run -d macos      # macOS
-flutter run -d linux      # Linux
-flutter run -d android    # Android
-flutter run -d ios        # iOS
-
-# 构建发布版
-flutter build windows
-flutter build macos
-flutter build linux
-flutter build apk         # Android APK
-flutter build ios         # iOS
-
-# 运行测试
-flutter test
-flutter test test/path/to/test.dart
-
-# 代码分析
-flutter analyze
-
-# 格式化代码
-dart format .
+flutter pub get                     # 安装依赖
+flutter run -d windows              # Windows 运行
+flutter build windows               # Windows 构建
+flutter analyze                     # 代码分析（修改代码后必须运行）
+dart format .                       # 格式化代码
+flutter test                        # 运行所有测试
+flutter test test/path/to/test.dart # 运行单个测试
 ```
 
-## 架构
+## 架构要点
+
+### 三层核心模块
 
 ```
-┌─────────────────────────────────────────────────────────┐
-│                      Myriad App                         │
-│  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐  │
-│  │  Server 模块  │  │  Discovery   │  │   Client 模块 │  │
-│  │ · 系统信息采集 │  │ · UDP 多播    │  │ · 设备列表    │  │
-│  │ · WebSocket   │  │ · 设备发现    │  │ · 实时图表    │  │
-│  │ · 数据推送    │  │ · 心跳检测    │  │ · 数据可视化  │  │
-│  └──────┬───────┘  └──────┬───────┘  └──────┬───────┘  │
-│         └─────────────────┴─────────────────┘           │
-│                    本地/网络通信                          │
-└─────────────────────────────────────────────────────────┘
+Server (lib/server/)  ←→  Discovery (lib/core/discovery/)  ←→  Client (lib/client/)
+采集系统指标               UDP 多播发现设备                    管理设备列表
+WebSocket 推送数据         心跳维持在线状态                    WebSocket 接收数据
 ```
 
-### 核心模块
+**数据流**：Server 采集 → WebSocket 推送 → Client 接收 → DeviceManager 更新 → UI 刷新
 
-- **Server 模块** (`lib/server/`): 采集系统指标（CPU、内存、磁盘、网络），通过 WebSocket 推送
-  - `system_info_collector.dart`: 抽象接口
-  - `windows_collector.dart`: Windows 平台实现（使用 dart:ffi）
-  - `server_service.dart`: WebSocket 服务器
+### 模块间关键依赖
 
-- **Discovery 模块** (`lib/core/discovery/`): 局域网设备自动发现
-  - `discovery_service.dart`: 抽象接口
-  - `udp_discovery.dart`: UDP 多播实现（地址 239.255.255.250:1900）
-  - `discovery_integration.dart`: 与 DeviceManager 的集成层
-  - `discovery_message.dart`: 消息格式（announce/heartbeat/heartbeat_ack）
+- `DiscoveryIntegration` 是 Discovery 和 DeviceManager 的桥梁，监听设备发现/离线事件并转发
+- `ServerService` 使用 `SystemInfoCollector` 采集数据，通过 `shelf` WebSocket 广播
+- `ClientService` 连接远程 WebSocket，接收 `SystemInfoData` 并通过 Stream 推送
+- `DeviceManager` 管理所有设备状态，提供离线检测（30秒超时）
 
-- **Client 模块** (`lib/client/`): 设备管理和 WebSocket 客户端
-  - `device_manager.dart`: 设备列表管理、离线检测
-  - `client_service.dart`: WebSocket 客户端、心跳、重连
+### 两套数据模型（注意区分）
 
-- **L10n 模块** (`lib/l10n/`): 国际化支持
-  - `app_localizations.dart`: 中文/英文翻译
-  - `locale_provider.dart`: 语言状态管理
+1. **Server 侧** (`lib/server/system_info_collector.dart`)：`SystemInfo` / `DiskInfo` / `NetworkTraffic` — 用于采集和 WebSocket 推送
+2. **Core 模型** (`lib/core/models/system_metrics.dart`)：`SystemMetrics` / `CpuMetrics` / `MemoryMetrics` 等 — 用于 UI 展示和详细指标
 
-### 页面
+两套模型的 JSON 字段命名风格不同（Server 用 camelCase，Core 用 snake_case）。
 
-1. **主页 (Home)**: 设备卡片列表，支持排序（按时间/名称/状态/IP）
-2. **服务端 (Server)**: 显示本机设备信息、WebSocket 服务状态、网络信息
-3. **配置 (Settings)**: 服务器配置、设备发现开关、语言切换、数据清理
-4. **关于 (About)**: 应用信息、技术栈（可跳转）、开发者信息（可跳转）
+### 状态管理 (Riverpod)
 
-### 底栏导航
+- 所有 Provider 定义在各自页面文件中（非集中管理）
+- `serverConfigProvider` — 服务器配置（端口、地址、推送间隔等）
+- `serverStatusProvider` — 服务运行状态
+- `deviceIdProvider` — 设备唯一 ID（UUID v4，首次生成后持久化）
+- `localeProvider` — 语言设置
+- `currentPageIndexProvider` — 底栏导航当前页
 
-主页 → 服务端 → 配置 → 关于
+### 国际化
+
+- 自定义 `AppLocalizations`（非 Flutter 官方 intl），通过 `locale.languageCode` switch 实现中/英文
+- 所有用户可见文本必须通过 `AppLocalizations.of(context)` 获取
+- 添加新翻译：在 `lib/l10n/app_localizations.dart` 中添加 getter
+
+### 设备发现协议
+
+UDP 多播地址 `239.255.255.250:1900`，三种消息类型：
+- `announce` — 设备上线公告
+- `heartbeat` — 心跳检测
+- `heartbeat_ack` — 心跳确认
 
 ## 代码风格
 
-- 遵循 Dart/Flutter 规范
-- 使用 Riverpod 状态管理
 - 优先使用 `const` 构造函数
-- UI 部分使用中文注释标注 widget 用途
-- 所有用户可见文本必须通过 `AppLocalizations` 获取
+- UI 注释用中文标注 widget 用途
+- 常量类使用私有构造函数 `ClassName._()` 防止实例化
+- 模型类实现 `fromJson` / `toJson` / `copyWith` 三件套
+- 资源释放统一使用 `dispose()` 方法，关闭 Stream 和 Timer
+
+## CI/CD
+
+GitHub Actions 工作流（`.github/workflows/`）：
+- `build.yml` — Push/PR 到 main 时自动构建全平台（Windows/Android/macOS/Linux/iOS）
+- `release.yml` — 发布工作流
+- `cleanup.yml` — 清理工作流
+
+CI 中使用 `flutter create --project-name myriad_monitor --platforms <平台> .` 生成平台目录。
 
 ## Git 规范
 
-### Commit Message 格式
+使用 Conventional Commits：`feat` / `fix` / `docs` / `style` / `refactor` / `perf` / `test` / `chore` / `ci` / `revert`
 
-使用 Conventional Commits：
-
-| 类型 | 说明 |
-|------|------|
-| `feat` | 新功能 |
-| `fix` | 修复 bug |
-| `docs` | 文档变更 |
-| `style` | 代码格式（不影响运行） |
-| `refactor` | 重构 |
-| `perf` | 性能优化 |
-| `test` | 测试相关 |
-| `chore` | 构建/工具变动 |
-| `ci` | CI 配置变更 |
-| `revert` | 回滚 |
-
-### 操作规范
-
-- **只 commit，不 push** — 用户审查后再决定是否推送
-- 修改代码后运行 `flutter analyze` 验证
+**只 commit，不 push** — 用户审查后再决定是否推送。修改代码后运行 `flutter analyze` 验证。

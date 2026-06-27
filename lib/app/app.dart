@@ -2,67 +2,6 @@ import 'package:flutter/material.dart';
 
 import '../core/constants.dart';
 
-/// 应用程序路由名称常量
-class AppRoutes {
-  /// 首页路由
-  static const String home = '/';
-
-  /// 设备详情页路由
-  static const String deviceDetail = '/device/detail';
-
-  /// 设置页路由
-  static const String settings = '/settings';
-
-  /// 关于页路由
-  static const String about = '/about';
-
-  /// 禁止实例化
-  AppRoutes._();
-}
-
-/// 应用路由配置
-///
-/// 集中管理所有页面路由配置
-class AppRouter {
-  /// 生成路由
-  static Route<dynamic> generateRoute(RouteSettings settings) {
-    switch (settings.name) {
-      case AppRoutes.home:
-        return _buildRoute(const _PlaceholderPage(title: '首页'), settings);
-
-      case AppRoutes.deviceDetail:
-        final deviceId = settings.arguments as String? ?? '';
-        return _buildRoute(
-          _PlaceholderPage(title: '设备详情 - $deviceId'),
-          settings,
-        );
-
-      case AppRoutes.settings:
-        return _buildRoute(const _PlaceholderPage(title: '设置'), settings);
-
-      case AppRoutes.about:
-        return _buildRoute(const _PlaceholderPage(title: '关于'), settings);
-
-      default:
-        return _buildRoute(
-          const _PlaceholderPage(title: '404 - 页面未找到'),
-          settings,
-        );
-    }
-  }
-
-  /// 构建页面路由（带过渡动画）
-  static MaterialPageRoute _buildRoute(Widget page, RouteSettings settings) {
-    return MaterialPageRoute(
-      builder: (_) => page,
-      settings: settings,
-    );
-  }
-
-  /// 禁止实例化
-  AppRouter._();
-}
-
 /// 应用主题配置
 ///
 /// 管理应用程序的亮色和暗色主题
@@ -195,45 +134,4 @@ class AppTheme {
 
   /// 禁止实例化
   AppTheme._();
-}
-
-/// 临时占位页面
-///
-/// 用于尚未实现的路由，后续会被实际页面替代
-class _PlaceholderPage extends StatelessWidget {
-  /// 页面标题
-  final String title;
-
-  const _PlaceholderPage({required this.title});
-
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        title: Text(title),
-      ),
-      body: Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(
-              Icons.construction_outlined,
-              size: 64,
-              color: Colors.grey[400],
-            ),
-            const SizedBox(height: UIConstants.defaultPadding),
-            Text(
-              title,
-              style: Theme.of(context).textTheme.headlineSmall,
-            ),
-            const SizedBox(height: UIConstants.smallPadding),
-            Text(
-              '此页面正在建设中...',
-              style: TextStyle(color: Colors.grey[600]),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
 }

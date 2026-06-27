@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import '../../core/storage/device_storage.dart';
 import '../../l10n/app_localizations.dart';
 import '../../l10n/locale_provider.dart';
 
@@ -364,7 +365,7 @@ class SettingsPage extends ConsumerWidget {
           ),
         ],
       ),
-    );
+    ).then((_) => controller.dispose());
   }
 
   /// 编辑监听地址
@@ -397,7 +398,7 @@ class SettingsPage extends ConsumerWidget {
           ),
         ],
       ),
-    );
+    ).then((_) => controller.dispose());
   }
 
   /// 编辑推送间隔
@@ -434,7 +435,7 @@ class SettingsPage extends ConsumerWidget {
           ),
         ],
       ),
-    );
+    ).then((_) => controller.dispose());
   }
 
   /// 编辑设备名称
@@ -467,7 +468,7 @@ class SettingsPage extends ConsumerWidget {
           ),
         ],
       ),
-    );
+    ).then((_) => controller.dispose());
   }
 
   /// 确认清除设备数据
@@ -483,14 +484,17 @@ class SettingsPage extends ConsumerWidget {
             child: Text(l10n.cancel),
           ),
           FilledButton(
-            onPressed: () {
+            onPressed: () async {
               Navigator.pop(context);
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(
-                  content: Text(l10n.deviceDataCleared),
-                  behavior: SnackBarBehavior.floating,
-                ),
-              );
+              await DeviceStorage().clearDevices();
+              if (context.mounted) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(
+                    content: Text(l10n.deviceDataCleared),
+                    behavior: SnackBarBehavior.floating,
+                  ),
+                );
+              }
             },
             style: FilledButton.styleFrom(
               backgroundColor: Theme.of(context).colorScheme.error,
@@ -515,14 +519,17 @@ class SettingsPage extends ConsumerWidget {
             child: Text(l10n.cancel),
           ),
           FilledButton(
-            onPressed: () {
+            onPressed: () async {
               Navigator.pop(context);
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(
-                  content: Text(l10n.historyDataCleared),
-                  behavior: SnackBarBehavior.floating,
-                ),
-              );
+              // TODO: 接入历史数据存储后清除历史数据
+              if (context.mounted) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(
+                    content: Text(l10n.historyDataCleared),
+                    behavior: SnackBarBehavior.floating,
+                  ),
+                );
+              }
             },
             style: FilledButton.styleFrom(
               backgroundColor: Theme.of(context).colorScheme.error,

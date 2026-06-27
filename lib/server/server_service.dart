@@ -1,10 +1,13 @@
 import 'dart:async';
 import 'dart:convert';
+import 'dart:io';
 
+import 'package:flutter/foundation.dart';
 import 'package:shelf/shelf_io.dart' as shelf_io;
 import 'package:shelf_web_socket/shelf_web_socket.dart';
 import 'package:web_socket_channel/web_socket_channel.dart';
 
+import '../core/constants.dart';
 import 'system_info_collector.dart';
 import 'windows_collector.dart';
 
@@ -25,7 +28,7 @@ class ServerService {
   final SystemInfoCollector _collector;
 
   /// HTTP 服务器实例
-  dynamic _server;
+  HttpServer? _server;
 
   /// 已连接的 WebSocket 客户端集合
   final Set<WebSocketChannel> _connectedClients = {};
@@ -46,7 +49,7 @@ class ServerService {
   /// [pushInterval] 数据推送间隔，默认 1 秒
   /// [collector] 系统信息采集器，默认使用 WindowsCollector
   ServerService({
-    this.port = 8080,
+    this.port = NetworkConstants.defaultWebSocketPort,
     this.address = '0.0.0.0',
     this.pushInterval = const Duration(seconds: 1),
     SystemInfoCollector? collector,
@@ -90,7 +93,7 @@ class ServerService {
 
       return true;
     } catch (e) {
-      // 启动失败，记录错误
+      debugPrint('[ServerService] 启动失败: $e');
       return false;
     }
   }
@@ -179,7 +182,7 @@ class ServerService {
           break;
       }
     } catch (e) {
-      // 消息解析失败
+      debugPrint('[ServerService] 消息解析失败: $e');
     }
   }
 
@@ -217,7 +220,7 @@ class ServerService {
       // 广播给所有客户端
       broadcastMessage(message);
     } catch (e) {
-      // 采集或推送失败
+      debugPrint('[ServerService] 采集或推送失败: $e');
     }
   }
 
