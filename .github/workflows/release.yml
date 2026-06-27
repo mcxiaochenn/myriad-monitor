@@ -165,10 +165,32 @@ jobs:
           name: android-debug
           path: build/app/outputs/flutter-apk/app-debug.apk
 
+  # iOS 构建（仅编译，不签名）
+  build-ios:
+    name: Build iOS
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+
+      - run: flutter create --project-name myriad_monitor --platforms ios .
+
+      - run: flutter pub get
+
+      - run: flutter build ios --release --no-codesign
+
+      - uses: actions/upload-artifact@v7
+        with:
+          name: ios-release
+          path: build/ios/iphoneos/
+
   # 创建 GitHub Release
   create-release:
     name: Create Release
-    needs: [build-windows, build-macos, build-linux, build-android]
+    needs: [build-windows, build-macos, build-linux, build-android, build-ios]
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -177,14 +199,41 @@ jobs:
         with:
           fetch-depth: 0
 
+      - name: Resolve release tag
+        id: tag
+        run: |
+          # workflow_dispatch 时使用用户输入的 tag，tag push 时使用 ref_name
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            TAG="${{ inputs.tag }}"
+          else
+            TAG="${{ github.ref_name }}"
+          fi
+          echo "tag=$TAG" >> $GITHUB_OUTPUT
+          echo "Resolved tag: $TAG (event: ${{ github.event_name }})"
+
+      - name: Create git tag if needed
+        run: |
+          TAG="${{ steps.tag.outputs.tag }}"
+          # 手动触发时，确保 tag 存在（指向当前 HEAD）
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            if ! git rev-parse "$TAG" >/dev/null 2>&1; then
+              echo "Creating tag: $TAG"
+              git tag "$TAG"
+              git push origin "$TAG"
+            else
+              echo "Tag $TAG already exists"
+            fi
+          fi
+
       - name: Download all artifacts
         uses: actions/download-artifact@v7
 
       - name: Generate changelog
         id: changelog
         run: |
-          # 获取上一个 tag
-          PREV_TAG=$(git describe --tags --abbrev=0 HEAD^ 2>/dev/null || echo "")
+          TAG="${{ steps.tag.outputs.tag }}"
+          # 获取上一个 tag（排除当前 tag）
+          PREV_TAG=$(git tag --sort=-v:refname | grep -v "^${TAG}$" | head -1 || echo "")
           echo "prev_tag=$PREV_TAG" >> $GITHUB_OUTPUT
           if [ -z "$PREV_TAG" ]; then
             echo "changelog=Initial release" >> $GITHUB_OUTPUT
@@ -199,10 +248,10 @@ jobs:
       - name: Create Release
         uses: softprops/action-gh-release@v3
         with:
-          tag_name: ${{ github.ref_name }}
-          name: ${{ github.ref_name }}
+          tag_name: ${{ steps.tag.outputs.tag }}
+          name: ${{ steps.tag.outputs.tag }}
           body: |
-            ## 万镜 Myriad ${{ github.ref_name }}
+            ## 万镜 Myriad ${{ steps.tag.outputs.tag }}
 
             去中心化的跨平台系统监控面板
 
@@ -231,7 +280,7 @@ jobs:
 
             ---
 
-            **Full Changelog**: https://github.com/${{ github.repository }}/commits/${{ github.ref_name }}
+            **Full Changelog**: https://github.com/${{ github.repository }}/commits/${{ steps.tag.outputs.tag }}
           files: |
             windows-portable/myriad-monitor-windows-portable.zip
             windows-installer/*.exe
