@@ -1,5 +1,6 @@
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
+import '../../l10n/app_localizations.dart';
 import 'chart_widget.dart';
 
 /// 设备详情页
@@ -20,6 +21,7 @@ class DeviceDetailPage extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final l10n = AppLocalizations.of(context);
 
     // 生成演示用的模拟数据
     final cpuData = _generateDemoData(30, 10, 80);
@@ -54,27 +56,27 @@ class DeviceDetailPage extends StatelessWidget {
         child: Column(
           children: [
             // ===== 设备信息卡片 =====
-            _buildDeviceInfoCard(theme),
+            _buildDeviceInfoCard(theme, l10n),
             const SizedBox(height: 12),
 
             // ===== CPU 使用率卡片 =====
-            _buildCpuCard(theme, cpuData),
+            _buildCpuCard(theme, l10n, cpuData),
             const SizedBox(height: 12),
 
             // ===== 内存卡片 =====
-            _buildMemoryCard(theme),
+            _buildMemoryCard(theme, l10n),
             const SizedBox(height: 12),
 
             // ===== GPU 卡片 =====
-            _buildGpuCard(theme),
+            _buildGpuCard(theme, l10n),
             const SizedBox(height: 12),
 
             // ===== 磁盘卡片 =====
-            _buildDiskCard(theme),
+            _buildDiskCard(theme, l10n),
             const SizedBox(height: 12),
 
             // ===== 网络卡片 =====
-            _buildNetworkCard(theme, uploadData, downloadData),
+            _buildNetworkCard(theme, l10n, uploadData, downloadData),
           ],
         ),
       ),
@@ -98,7 +100,7 @@ class DeviceDetailPage extends StatelessWidget {
   // 设备信息卡片
   // ============================================================
 
-  Widget _buildDeviceInfoCard(ThemeData theme) {
+  Widget _buildDeviceInfoCard(ThemeData theme, AppLocalizations l10n) {
     return Card(
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
       child: Padding(
@@ -111,7 +113,7 @@ class DeviceDetailPage extends StatelessWidget {
               children: [
                 Icon(Icons.computer, color: theme.colorScheme.primary),
                 const SizedBox(width: 8),
-                Text('设备信息', style: theme.textTheme.titleMedium),
+                Text(l10n.detailDeviceInfo, style: theme.textTheme.titleMedium),
               ],
             ),
             const SizedBox(height: 16),
@@ -122,19 +124,19 @@ class DeviceDetailPage extends StatelessWidget {
                 _buildInfoItem(
                   theme,
                   Icons.badge,
-                  '主机名',
+                  l10n.detailHostName,
                   deviceName,
                 ),
                 _buildInfoItem(
                   theme,
                   Icons.laptop_windows,
-                  '操作系统',
+                  l10n.detailOs,
                   'Windows 11',
                 ),
                 _buildInfoItem(
                   theme,
                   Icons.schedule,
-                  '运行时长',
+                  l10n.detailUptime,
                   '3天 12小时',
                 ),
               ],
@@ -173,7 +175,7 @@ class DeviceDetailPage extends StatelessWidget {
   // CPU 使用率卡片
   // ============================================================
 
-  Widget _buildCpuCard(ThemeData theme, List<double> cpuData) {
+  Widget _buildCpuCard(ThemeData theme, AppLocalizations l10n, List<double> cpuData) {
     return Card(
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
       child: Padding(
@@ -186,14 +188,14 @@ class DeviceDetailPage extends StatelessWidget {
               children: [
                 Icon(Icons.memory, color: theme.colorScheme.primary),
                 const SizedBox(width: 8),
-                Text('CPU 使用率', style: theme.textTheme.titleMedium),
+                Text(l10n.detailCpuUsage, style: theme.textTheme.titleMedium),
               ],
             ),
             const SizedBox(height: 12),
             // 实时折线图
             RealtimeLineChart(
               dataPoints: cpuData,
-              title: 'CPU 使用率',
+              title: l10n.detailCpuUsage,
               unit: '%',
               lineColor: Colors.green,
               maxY: 100,
@@ -211,7 +213,7 @@ class DeviceDetailPage extends StatelessWidget {
   // 内存卡片
   // ============================================================
 
-  Widget _buildMemoryCard(ThemeData theme) {
+  Widget _buildMemoryCard(ThemeData theme, AppLocalizations l10n) {
     const usedGb = 8.2;
     const totalGb = 16.0;
     const usage = usedGb / totalGb; // 使用比例
@@ -228,13 +230,16 @@ class DeviceDetailPage extends StatelessWidget {
               children: [
                 Icon(Icons.storage, color: theme.colorScheme.primary),
                 const SizedBox(width: 8),
-                Text('内存', style: theme.textTheme.titleMedium),
+                Text(l10n.detailMemory, style: theme.textTheme.titleMedium),
               ],
             ),
             const SizedBox(height: 16),
             // 使用量文本
             Text(
-              '已用 ${usedGb.toStringAsFixed(1)} GB / 总共 ${totalGb.toStringAsFixed(1)} GB',
+              l10n.detailMemoryUsage(
+                '${usedGb.toStringAsFixed(1)} GB',
+                '${totalGb.toStringAsFixed(1)} GB',
+              ),
               style: theme.textTheme.bodyMedium?.copyWith(
                 color: theme.colorScheme.onSurfaceVariant,
               ),
@@ -274,7 +279,7 @@ class DeviceDetailPage extends StatelessWidget {
   // GPU 卡片
   // ============================================================
 
-  Widget _buildGpuCard(ThemeData theme) {
+  Widget _buildGpuCard(ThemeData theme, AppLocalizations l10n) {
     return Card(
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
       child: Padding(
@@ -287,7 +292,7 @@ class DeviceDetailPage extends StatelessWidget {
               children: [
                 Icon(Icons.videocam, color: theme.colorScheme.primary),
                 const SizedBox(width: 8),
-                Text('GPU', style: theme.textTheme.titleMedium),
+                Text(l10n.detailGpu, style: theme.textTheme.titleMedium),
               ],
             ),
             const SizedBox(height: 16),
@@ -298,7 +303,7 @@ class DeviceDetailPage extends StatelessWidget {
                   child: _buildGpuItem(
                     theme,
                     Icons.developer_board,
-                    '型号',
+                    l10n.detailGpuModel,
                     'NVIDIA RTX 4070',
                   ),
                 ),
@@ -306,7 +311,7 @@ class DeviceDetailPage extends StatelessWidget {
                   child: _buildGpuItem(
                     theme,
                     Icons.thermostat,
-                    '温度',
+                    l10n.detailTemperature,
                     '65°C',
                   ),
                 ),
@@ -319,7 +324,7 @@ class DeviceDetailPage extends StatelessWidget {
                   child: _buildGpuItem(
                     theme,
                     Icons.memory,
-                    '显存',
+                    l10n.detailVram,
                     '8 GB / 12 GB',
                   ),
                 ),
@@ -327,7 +332,7 @@ class DeviceDetailPage extends StatelessWidget {
                   child: _buildGpuItem(
                     theme,
                     Icons.speed,
-                    '利用率',
+                    l10n.detailUtilization,
                     '45%',
                   ),
                 ),
@@ -380,7 +385,7 @@ class DeviceDetailPage extends StatelessWidget {
   // 磁盘卡片
   // ============================================================
 
-  Widget _buildDiskCard(ThemeData theme) {
+  Widget _buildDiskCard(ThemeData theme, AppLocalizations l10n) {
     // 磁盘分区演示数据
     final partitions = [
       const _DiskPartition('C:', 'NTFS', 186.5, 237.0),
@@ -400,7 +405,7 @@ class DeviceDetailPage extends StatelessWidget {
               children: [
                 Icon(Icons.disc_full, color: theme.colorScheme.primary),
                 const SizedBox(width: 8),
-                Text('磁盘', style: theme.textTheme.titleMedium),
+                Text(l10n.detailDisk, style: theme.textTheme.titleMedium),
               ],
             ),
             const SizedBox(height: 16),
@@ -472,6 +477,7 @@ class DeviceDetailPage extends StatelessWidget {
 
   Widget _buildNetworkCard(
     ThemeData theme,
+    AppLocalizations l10n,
     List<double> uploadData,
     List<double> downloadData,
   ) {
@@ -493,7 +499,7 @@ class DeviceDetailPage extends StatelessWidget {
               children: [
                 Icon(Icons.wifi, color: theme.colorScheme.primary),
                 const SizedBox(width: 8),
-                Text('网络', style: theme.textTheme.titleMedium),
+                Text(l10n.detailNetwork, style: theme.textTheme.titleMedium),
               ],
             ),
             const SizedBox(height: 16),
@@ -505,7 +511,7 @@ class DeviceDetailPage extends StatelessWidget {
                 Column(
                   children: [
                     Text(
-                      '上行速率',
+                      l10n.detailUploadSpeed,
                       style: theme.textTheme.bodySmall?.copyWith(
                         color: theme.colorScheme.onSurfaceVariant,
                       ),
@@ -523,7 +529,7 @@ class DeviceDetailPage extends StatelessWidget {
                 Column(
                   children: [
                     Text(
-                      '下行速率',
+                      l10n.detailDownloadSpeed,
                       style: theme.textTheme.bodySmall?.copyWith(
                         color: theme.colorScheme.onSurfaceVariant,
                       ),
@@ -545,7 +551,7 @@ class DeviceDetailPage extends StatelessWidget {
             // 上行速率图表
             RealtimeLineChart(
               dataPoints: uploadData,
-              title: '上行速率',
+              title: l10n.detailUploadSpeed,
               unit: 'MB/s',
               lineColor: Colors.orange,
               maxY: 50,
@@ -558,7 +564,7 @@ class DeviceDetailPage extends StatelessWidget {
             // 下行速率图表
             RealtimeLineChart(
               dataPoints: downloadData,
-              title: '下行速率',
+              title: l10n.detailDownloadSpeed,
               unit: 'MB/s',
               lineColor: Colors.cyan,
               maxY: 100,

@@ -295,6 +295,29 @@ class AppLocalizations {
     }
     return 'Opening $name monitor';
   }
+
+  String get detailDeviceInfo => locale.languageCode == 'zh' ? '设备信息' : 'Device Info';
+  String get detailHostName => locale.languageCode == 'zh' ? '主机名' : 'Hostname';
+  String get detailOs => locale.languageCode == 'zh' ? '操作系统' : 'OS';
+  String get detailUptime => locale.languageCode == 'zh' ? '运行时长' : 'Uptime';
+  String get detailCpuUsage => locale.languageCode == 'zh' ? 'CPU 使用率' : 'CPU Usage';
+  String get detailMemory => locale.languageCode == 'zh' ? '内存' : 'Memory';
+  String detailMemoryUsage(String used, String total) {
+    if (locale.languageCode == 'zh') {
+      return '已用 $used / 总共 $total';
+    }
+    return 'Used $used / Total $total';
+  }
+  String get detailGpu => 'GPU';
+  String get detailGpuModel => locale.languageCode == 'zh' ? '型号' : 'Model';
+  String get detailTemperature => locale.languageCode == 'zh' ? '温度' : 'Temp';
+  String get detailVram => locale.languageCode == 'zh' ? '显存' : 'VRAM';
+  String get detailUtilization => locale.languageCode == 'zh' ? '利用率' : 'Util';
+  String get detailDisk => locale.languageCode == 'zh' ? '磁盘' : 'Disk';
+  String get detailNetwork => locale.languageCode == 'zh' ? '网络' : 'Network';
+  String get detailUploadSpeed => locale.languageCode == 'zh' ? '上行速率' : 'Upload';
+  String get detailDownloadSpeed => locale.languageCode == 'zh' ? '下行速率' : 'Download';
+  String get detailWaitingForData => locale.languageCode == 'zh' ? '等待数据...' : 'Waiting for data...';
 }
 
 /// 本地化代理
