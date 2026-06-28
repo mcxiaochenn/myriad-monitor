@@ -30,8 +30,11 @@ class ManagedDevice {
   /// 设备 IP 地址
   String ipAddress;
 
-  /// WebSocket 服务端口
+  /// HTTP 服务端口
   int port;
+
+  /// HTTP API 访问令牌（SHA256）
+  String accessToken;
 
   /// 设备在线状态
   DeviceOnlineStatus onlineStatus;
@@ -53,6 +56,7 @@ class ManagedDevice {
     required this.name,
     required this.ipAddress,
     required this.port,
+    this.accessToken = '',
     this.onlineStatus = DeviceOnlineStatus.unknown,
     this.lastSystemInfo,
     required this.discoveredAt,
@@ -60,8 +64,9 @@ class ManagedDevice {
     this.remark,
   });
 
-  /// 完整 WebSocket 连接地址
-  String get wsUrl => 'ws://$ipAddress:$port';
+  /// 完整 HTTP API 地址
+  /// 格式: http://ip:port/deviceId/accessToken
+  String get httpUrl => 'http://$ipAddress:$port/$deviceId/$accessToken';
 
   /// 是否在线
   bool get isOnline => onlineStatus == DeviceOnlineStatus.online;
@@ -73,6 +78,7 @@ class ManagedDevice {
       'name': name,
       'ipAddress': ipAddress,
       'port': port,
+      'accessToken': accessToken,
       'onlineStatus': onlineStatus.name,
       'discoveredAt': discoveredAt.toIso8601String(),
       'lastSeenAt': lastSeenAt?.toIso8601String(),
@@ -87,6 +93,7 @@ class ManagedDevice {
       name: json['name'] as String,
       ipAddress: json['ipAddress'] as String,
       port: json['port'] as int,
+      accessToken: json['accessToken'] as String? ?? '',
       onlineStatus: DeviceOnlineStatus.values.firstWhere(
         (e) => e.name == json['onlineStatus'],
         orElse: () => DeviceOnlineStatus.unknown,

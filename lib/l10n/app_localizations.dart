@@ -167,7 +167,7 @@ class AppLocalizations {
   String get autoStartServer =>
       locale.languageCode == 'zh' ? '自动启动服务器' : 'Auto start server';
   String get autoStartServerDesc =>
-      locale.languageCode == 'zh' ? '应用启动时自动开启 WebSocket 服务器' : 'Start WebSocket server on app launch';
+      locale.languageCode == 'zh' ? '应用启动时自动开启 HTTP 服务器' : 'Start HTTP server on app launch';
   String get serverPort => locale.languageCode == 'zh' ? '服务器端口' : 'Server Port';
   String get listenAddress => locale.languageCode == 'zh' ? '监听地址' : 'Listen Address';
   String get pushInterval => locale.languageCode == 'zh' ? '数据推送间隔' : 'Push Interval';
@@ -275,11 +275,22 @@ class AppLocalizations {
   String get os => locale.languageCode == 'zh' ? '操作系统' : 'OS';
   String get hostname => locale.languageCode == 'zh' ? '主机名' : 'Hostname';
   String get serviceStatus => locale.languageCode == 'zh' ? '服务状态' : 'Service Status';
-  String get websocketService => locale.languageCode == 'zh' ? 'WebSocket 服务' : 'WebSocket Service';
+  String get httpService => locale.languageCode == 'zh' ? 'HTTP 服务' : 'HTTP Service';
   String get running => locale.languageCode == 'zh' ? '运行中' : 'Running';
   String get stopped => locale.languageCode == 'zh' ? '已停止' : 'Stopped';
   String get startService => locale.languageCode == 'zh' ? '启动服务' : 'Start Service';
   String get stopService => locale.languageCode == 'zh' ? '停止服务' : 'Stop Service';
+  String get accessUrl => locale.languageCode == 'zh' ? '访问地址' : 'Access URL';
+  String get accessTokenLabel => locale.languageCode == 'zh' ? '访问令牌' : 'Access Token';
+  String get resetAccessToken => locale.languageCode == 'zh' ? '重置访问令牌' : 'Reset Access Token';
+  String get resetAccessTokenDesc =>
+      locale.languageCode == 'zh' ? '生成新的 SHA256 访问令牌（现有客户端需重新获取）' :
+      'Generate a new SHA256 access token (existing clients must re-obtain)';
+  String get tokenResetSuccess =>
+      locale.languageCode == 'zh' ? '访问令牌已重置' : 'Access token has been reset';
+  String get copyToken => locale.languageCode == 'zh' ? '复制令牌' : 'Copy Token';
+  String get tokenCopied =>
+      locale.languageCode == 'zh' ? '令牌已复制到剪贴板' : 'Token copied to clipboard';
   String get networkInfo => locale.languageCode == 'zh' ? '网络信息' : 'Network Info';
   String get detecting => locale.languageCode == 'zh' ? '检测中...' : 'Detecting...';
   String get connectedClients => locale.languageCode == 'zh' ? '已连接的客户端' : 'Connected Clients';

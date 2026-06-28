@@ -5,26 +5,17 @@ library;
 
 /// 网络相关常量
 class NetworkConstants {
-  /// WebSocket 默认端口号
-  static const int defaultWebSocketPort = 19190;
-
   /// HTTP 服务默认端口号
   static const int defaultHttpPort = 19191;
 
-  /// WebSocket 连接超时时间（秒）
+  /// HTTP 请求超时时间（秒）
   static const int connectionTimeoutSeconds = 10;
 
-  /// WebSocket 重连间隔（秒）
-  static const int reconnectIntervalSeconds = 5;
+  /// HTTP 轮询间隔（秒），客户端定期拉取数据
+  static const int pollingIntervalSeconds = 1;
 
-  /// 最大重连次数
-  static const int maxReconnectAttempts = 10;
-
-  /// 心跳检测间隔（秒）
-  static const int heartbeatIntervalSeconds = 30;
-
-  /// 心跳超时时间（秒）
-  static const int heartbeatTimeoutSeconds = 60;
+  /// 最大重试次数
+  static const int maxRetryAttempts = 3;
 
   /// 禁止实例化
   NetworkConstants._();

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import '../../core/access_token.dart';
 import '../../core/storage/device_storage.dart';
 import '../../core/theme_provider.dart';
 import '../../l10n/app_localizations.dart';
@@ -231,6 +232,18 @@ class SettingsPage extends ConsumerWidget {
             subtitle: Text(_getThemeName(ref, l10n)),
             trailing: const Icon(Icons.chevron_right),
             onTap: () => _showThemeDialog(context, ref, l10n),
+          ),
+
+          const Divider(),
+
+          // 安全设置区域
+          _buildSectionHeader(context, l10n.accessTokenLabel),
+          ListTile(
+            leading: const Icon(Icons.key),
+            title: Text(l10n.resetAccessToken),
+            subtitle: Text(l10n.resetAccessTokenDesc),
+            trailing: const Icon(Icons.refresh),
+            onTap: () => _confirmResetToken(context, ref, l10n),
           ),
 
           const Divider(),
@@ -618,6 +631,44 @@ class SettingsPage extends ConsumerWidget {
               backgroundColor: Theme.of(context).colorScheme.error,
             ),
             child: Text(l10n.delete),
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// 确认重置访问令牌
+  void _confirmResetToken(
+    BuildContext context,
+    WidgetRef ref,
+    AppLocalizations l10n,
+  ) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text(l10n.resetAccessToken),
+        content: Text(l10n.resetAccessTokenDesc),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: Text(l10n.cancel),
+          ),
+          FilledButton(
+            onPressed: () async {
+              Navigator.pop(context);
+              await resetAccessToken();
+              // 刷新 Provider 以获取新令牌
+              ref.invalidate(accessTokenProvider);
+              if (context.mounted) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(
+                    content: Text(l10n.tokenResetSuccess),
+                    behavior: SnackBarBehavior.floating,
+                  ),
+                );
+              }
+            },
+            child: Text(l10n.save),
           ),
         ],
       ),

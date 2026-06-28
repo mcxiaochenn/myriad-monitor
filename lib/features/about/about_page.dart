@@ -219,9 +219,9 @@ class AboutPage extends StatelessWidget {
               ),
               _buildTechItem(
                 context,
-                'WebSocket',
+                'HTTP (shelf)',
                 l10n.deviceCommunication,
-                'https://developer.mozilla.org/en-US/docs/Web/API/WebSockets_API',
+                'https://pub.dev/packages/shelf',
               ),
               _buildTechItem(
                 context,

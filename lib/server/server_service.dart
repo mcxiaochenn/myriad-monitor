@@ -3,20 +3,33 @@ import 'dart:convert';
 import 'dart:io';
 
 import 'package:flutter/foundation.dart';
+import 'package:shelf/shelf.dart';
 import 'package:shelf/shelf_io.dart' as shelf_io;
-import 'package:shelf_web_socket/shelf_web_socket.dart';
-import 'package:web_socket_channel/web_socket_channel.dart';
 
+import '../core/access_token.dart';
 import '../core/constants.dart';
 import 'system_info_collector.dart';
 import 'windows_collector.dart';
 
-/// WebSocket 服务器服务
+/// CORS 响应头（允许跨域访问）
+const _corsHeaders = {
+  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Methods': 'GET, OPTIONS',
+  'Access-Control-Allow-Headers': 'Content-Type',
+};
+
+/// JSON 响应头
+const _jsonHeaders = {
+  'Content-Type': 'application/json; charset=utf-8',
+};
+
+/// HTTP 服务器服务
 ///
-/// 提供 WebSocket 服务器功能，支持：
-/// - 启动/停止 WebSocket 服务器
-/// - 监听客户端连接
-/// - 定时推送系统信息数据
+/// 提供 HTTP API 服务，支持：
+/// - GET /{deviceId}/{accessToken} → 返回系统信息 JSON
+/// - GET /health → 健康检查
+///
+/// 客户端通过 HTTP GET 轮询拉取数据，替代原先的 WebSocket 推送。
 class ServerService {
   /// 服务器监听端口
   final int port;
@@ -30,67 +43,62 @@ class ServerService {
   /// HTTP 服务器实例
   HttpServer? _server;
 
-  /// 已连接的 WebSocket 客户端集合
-  final Set<WebSocketChannel> _connectedClients = {};
-
   /// 服务器运行状态
   bool _isRunning = false;
 
-  /// 数据推送定时器
-  Timer? _pushTimer;
+  /// 本机设备 ID
+  String _deviceId = '';
 
-  /// 数据推送间隔（默认 1 秒）
-  final Duration pushInterval;
+  /// 本机设备名称
+  String _deviceName = '';
+
+  /// 预期的访问令牌（从持久化存储加载）
+  String _expectedToken = '';
 
   /// 构造函数
   ///
-  /// [port] 服务器端口，默认 8080
+  /// [port] 服务器端口，默认 19191
   /// [address] 监听地址，默认 '0.0.0.0'（接受所有连接）
-  /// [pushInterval] 数据推送间隔，默认 1 秒
   /// [collector] 系统信息采集器，默认使用 WindowsCollector
   ServerService({
-    this.port = NetworkConstants.defaultWebSocketPort,
+    this.port = NetworkConstants.defaultHttpPort,
     this.address = '0.0.0.0',
-    this.pushInterval = const Duration(seconds: 1),
     SystemInfoCollector? collector,
   }) : _collector = collector ?? WindowsCollector();
 
   /// 服务器是否正在运行
   bool get isRunning => _isRunning;
 
-  /// 当前已连接的客户端数量
-  int get clientCount => _connectedClients.length;
-
-  /// 启动 WebSocket 服务器
+  /// 启动 HTTP 服务器
   ///
-  /// 创建 WebSocket 处理器并绑定到指定端口
+  /// [deviceId] 本机设备唯一标识
+  /// [deviceName] 本机设备显示名称
   /// 返回是否启动成功
-  Future<bool> start() async {
-    if (_isRunning) {
-      return true;
-    }
+  Future<bool> start({
+    required String deviceId,
+    required String deviceName,
+  }) async {
+    if (_isRunning) return true;
 
     try {
-      // 创建 WebSocket 处理器
-      final handler = webSocketHandler((WebSocketChannel webSocket) {
-        _onClientConnected(webSocket);
-      });
+      _deviceId = deviceId;
+      _deviceName = deviceName;
+      _expectedToken = await loadAccessToken();
 
-      // 使用 shelf 启动 HTTP 服务器
+      // 启动 HTTP 服务器
       _server = await shelf_io.serve(
-        handler,
+        _handleRequest,
         address,
         port,
       );
 
-      _isRunning = true;
-
-      // 启动系统信息采集
+      // 启动系统信息采集（后台缓存最新数据）
       _collector.startPeriodicCollection();
 
-      // 启动数据推送
-      _startPushingData();
+      _isRunning = true;
 
+      debugPrint('[ServerService] HTTP 服务已启动: http://$address:$port');
+      debugPrint('[ServerService] 设备 ID: $_deviceId');
       return true;
     } catch (e) {
       debugPrint('[ServerService] 启动失败: $e');
@@ -98,178 +106,83 @@ class ServerService {
     }
   }
 
-  /// 停止 WebSocket 服务器
+  /// 停止 HTTP 服务器
   ///
-  /// 关闭所有客户端连接并停止服务器
+  /// 停止采集并关闭服务器。
   Future<void> stop() async {
-    if (!_isRunning) {
-      return;
-    }
+    if (!_isRunning) return;
 
-    // 停止数据推送
-    _stopPushingData();
-
-    // 停止系统信息采集
     _collector.stopPeriodicCollection();
 
-    // 关闭所有客户端连接
-    _disconnectAllClients();
-
-    // 关闭 HTTP 服务器
     await _server?.close(force: true);
     _server = null;
 
     _isRunning = false;
+    debugPrint('[ServerService] HTTP 服务已停止');
   }
 
-  /// 处理客户端连接
-  ///
-  /// [webSocket] 新连接的 WebSocket 通道
-  void _onClientConnected(WebSocketChannel webSocket) {
-    // 将客户端添加到已连接集合
-    _connectedClients.add(webSocket);
+  /// HTTP 请求处理器
+  Future<Response> _handleRequest(Request request) async {
+    final cors = Map<String, String>.from(_corsHeaders);
 
-    // 监听客户端消息
-    webSocket.stream.listen(
-      (message) {
-        _onClientMessage(webSocket, message);
-      },
-      onDone: () {
-        // 客户端断开连接
-        _onClientDisconnected(webSocket);
-      },
-      onError: (error) {
-        // 连接错误，移除客户端
-        _onClientDisconnected(webSocket);
-      },
+    // CORS 预检请求
+    if (request.method == 'OPTIONS') {
+      return Response.ok('', headers: cors);
+    }
+
+    // 健康检查
+    if (request.url.path == 'health') {
+      return Response.ok(
+        jsonEncode({'status': 'ok'}),
+        headers: {..._jsonHeaders, ...cors},
+      );
+    }
+
+    // 系统信息 API: GET /{deviceId}/{accessToken}
+    final segments = request.url.pathSegments;
+    if (request.method == 'GET' && segments.length == 2) {
+      final reqDeviceId = segments[0];
+      final reqToken = segments[1];
+
+      if (reqDeviceId != _deviceId || reqToken != _expectedToken) {
+        return Response.forbidden(
+          jsonEncode({'error': 'Forbidden: invalid device ID or access token'}),
+          headers: {..._jsonHeaders, ...cors},
+        );
+      }
+
+      // 采集系统信息并返回 JSON
+      try {
+        final info = await _collector.collectAll();
+        final responseJson = {
+          'deviceId': _deviceId,
+          'deviceName': _deviceName,
+          ...info.toJson(),
+        };
+
+        return Response.ok(
+          jsonEncode(responseJson),
+          headers: {..._jsonHeaders, ...cors},
+        );
+      } catch (e) {
+        debugPrint('[ServerService] 采集失败: $e');
+        return Response.internalServerError(
+          body: jsonEncode({'error': 'Failed to collect system info'}),
+          headers: {..._jsonHeaders, ...cors},
+        );
+      }
+    }
+
+    // 未匹配的路由
+    return Response.notFound(
+      jsonEncode({'error': 'Not Found'}),
+      headers: {..._jsonHeaders, ...cors},
     );
-
-    // 发送欢迎消息
-    _sendToClient(webSocket, {
-      'type': 'connected',
-      'message': '已连接到 Myriad Monitor 服务器',
-    });
-  }
-
-  /// 处理客户端断开连接
-  ///
-  /// [webSocket] 断开的 WebSocket 通道
-  void _onClientDisconnected(WebSocketChannel webSocket) {
-    _connectedClients.remove(webSocket);
-  }
-
-  /// 处理客户端消息
-  ///
-  /// [webSocket] 发送消息的客户端
-  /// [message] 接收到的消息内容
-  void _onClientMessage(WebSocketChannel webSocket, dynamic message) {
-    try {
-      final data = jsonDecode(message as String);
-      final type = data['type'] as String?;
-
-      switch (type) {
-        case 'subscribe':
-          // TODO: 处理订阅请求
-          break;
-        case 'unsubscribe':
-          // TODO: 处理取消订阅请求
-          break;
-        case 'request':
-          // TODO: 处理数据请求
-          break;
-        default:
-          // 未知消息类型
-          break;
-      }
-    } catch (e) {
-      debugPrint('[ServerService] 消息解析失败: $e');
-    }
-  }
-
-  /// 启动数据推送定时器
-  void _startPushingData() {
-    _stopPushingData();
-
-    _pushTimer = Timer.periodic(pushInterval, (_) async {
-      await _pushSystemInfo();
-    });
-  }
-
-  /// 停止数据推送定时器
-  void _stopPushingData() {
-    _pushTimer?.cancel();
-    _pushTimer = null;
-  }
-
-  /// 推送系统信息到所有客户端
-  Future<void> _pushSystemInfo() async {
-    if (_connectedClients.isEmpty) {
-      return;
-    }
-
-    try {
-      // 采集系统信息
-      final info = await _collector.collectAll();
-
-      // 构造推送消息
-      final message = {
-        'type': 'systemInfo',
-        'data': info.toJson(),
-      };
-
-      // 广播给所有客户端
-      broadcastMessage(message);
-    } catch (e) {
-      debugPrint('[ServerService] 采集或推送失败: $e');
-    }
-  }
-
-  /// 向单个客户端发送消息
-  ///
-  /// [webSocket] 目标客户端
-  /// [data] 要发送的数据（会被 JSON 编码）
-  void _sendToClient(WebSocketChannel webSocket, Map<String, dynamic> data) {
-    try {
-      webSocket.sink.add(jsonEncode(data));
-    } catch (e) {
-      // 发送失败，移除客户端
-      _onClientDisconnected(webSocket);
-    }
-  }
-
-  /// 广播消息给所有已连接的客户端
-  ///
-  /// [data] 要广播的数据（会被 JSON 编码）
-  void broadcastMessage(Map<String, dynamic> data) {
-    final message = jsonEncode(data);
-
-    // 遍历所有客户端并发送
-    // 使用 toList() 避免在遍历时修改集合
-    for (final client in _connectedClients.toList()) {
-      try {
-        client.sink.add(message);
-      } catch (e) {
-        // 发送失败，移除客户端
-        _onClientDisconnected(client);
-      }
-    }
-  }
-
-  /// 断开所有客户端连接
-  void _disconnectAllClients() {
-    for (final client in _connectedClients.toList()) {
-      try {
-        client.sink.close();
-      } catch (e) {
-        // 关闭失败，忽略
-      }
-    }
-    _connectedClients.clear();
   }
 
   /// 释放资源
   ///
-  /// 停止服务器并清理所有资源
+  /// 停止服务器并清理所有资源。
   Future<void> dispose() async {
     await stop();
     _collector.dispose();

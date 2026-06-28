@@ -92,6 +92,7 @@ class DiscoveryIntegration {
         name: message.deviceName,
         ipAddress: message.ip,
         port: message.port,
+        accessToken: message.accessToken,
         onlineStatus: DeviceOnlineStatus.online,
         discoveredAt: DateTime.now(),
         lastSeenAt: DateTime.now(),

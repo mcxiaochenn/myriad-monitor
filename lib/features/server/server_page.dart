@@ -1,8 +1,10 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:uuid/uuid.dart';
+import '../../core/access_token.dart';
 import '../../l10n/app_localizations.dart';
 import '../settings/settings_page.dart';
 
@@ -39,7 +41,7 @@ class ServerStatusNotifier extends StateNotifier<ServerStatus> {
 
   void toggleService() {
     state = state.copyWith(isRunning: !state.isRunning);
-    // TODO: 实际启动/停止 WebSocket 服务
+    // TODO: 实际启动/停止 HTTP 服务
   }
 
   void updateClientCount(int count) {
@@ -62,7 +64,7 @@ final deviceIdProvider = FutureProvider<String>((ref) async {
 
 /// 服务端页面
 ///
-/// 显示当前设备信息和 WebSocket 服务运行状态
+/// 显示当前设备信息和 HTTP 服务运行状态
 class ServerPage extends ConsumerWidget {
   const ServerPage({super.key});
 
@@ -155,6 +157,9 @@ class ServerPage extends ConsumerWidget {
     ServerConfig config,
     ServerStatus status,
   ) {
+    final deviceIdAsync = ref.watch(deviceIdProvider);
+    final tokenAsync = ref.watch(accessTokenProvider);
+
     return Card(
       margin: const EdgeInsets.symmetric(horizontal: 16),
       child: Padding(
@@ -177,13 +182,58 @@ class ServerPage extends ConsumerWidget {
             ),
             const Divider(),
             _buildStatusRow(
-              l10n.websocketService,
+              l10n.httpService,
               status.isRunning,
               status.isRunning ? l10n.running : l10n.stopped,
             ),
             _buildInfoRow(l10n.serverPort, '${config.port}'),
             _buildInfoRow(l10n.listenAddress, config.address),
             _buildInfoRow(l10n.pushInterval, l10n.seconds(config.pushInterval)),
+            const Divider(),
+            // HTTP API 访问地址
+            deviceIdAsync.when(
+              data: (deviceId) => tokenAsync.when(
+                data: (token) {
+                  final url = 'http://{ip}:${config.port}/$deviceId/$token';
+                  return Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      _buildInfoRow(l10n.accessUrl, url),
+                      const SizedBox(height: 8),
+                      Row(
+                        children: [
+                          Expanded(
+                            child: _buildInfoRow(
+                              l10n.accessTokenLabel,
+                              token.length > 16
+                                  ? '${token.substring(0, 8)}...${token.substring(token.length - 8)}'
+                                  : token,
+                            ),
+                          ),
+                          IconButton(
+                            icon: const Icon(Icons.copy, size: 18),
+                            tooltip: l10n.copyToken,
+                            onPressed: () {
+                              Clipboard.setData(ClipboardData(text: token));
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                SnackBar(
+                                  content: Text(l10n.tokenCopied),
+                                  behavior: SnackBarBehavior.floating,
+                                ),
+                              );
+                            },
+                          ),
+                        ],
+                      ),
+                    ],
+                  );
+                },
+                loading: () => _buildInfoRow(l10n.accessTokenLabel, '...'),
+                error: (_, __) => _buildInfoRow(l10n.accessTokenLabel, 'Error'),
+              ),
+              loading: () => _buildInfoRow(l10n.accessUrl, '...'),
+              error: (_, __) => _buildInfoRow(l10n.accessUrl, 'Error'),
+            ),
             const SizedBox(height: 16),
             SizedBox(
               width: double.infinity,

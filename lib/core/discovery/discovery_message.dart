@@ -44,6 +44,9 @@ class DiscoveryMessage {
   /// 操作系统标识（如 windows、macos、linux）
   final String os;
 
+  /// HTTP API 访问令牌（SHA256 哈希，64 位 HEX）
+  final String accessToken;
+
   /// 消息发送时的 Unix 时间戳（毫秒）
   final int timestamp;
 
@@ -55,6 +58,7 @@ class DiscoveryMessage {
     required this.ip,
     required this.port,
     required this.os,
+    required this.accessToken,
     required this.timestamp,
   });
 
@@ -70,6 +74,7 @@ class DiscoveryMessage {
       ip: json['ip'] as String? ?? '',
       port: json['port'] as int? ?? 0,
       os: json['os'] as String? ?? '',
+      accessToken: json['access_token'] as String? ?? '',
       timestamp: json['timestamp'] as int? ?? 0,
     );
   }
@@ -85,6 +90,7 @@ class DiscoveryMessage {
       'ip': ip,
       'port': port,
       'os': os,
+      'access_token': accessToken,
       'timestamp': timestamp,
     };
   }
@@ -117,6 +123,7 @@ class DiscoveryMessage {
       ip: ip,
       port: port,
       os: os,
+      accessToken: accessToken,
       timestamp: DateTime.now().millisecondsSinceEpoch,
     );
   }
