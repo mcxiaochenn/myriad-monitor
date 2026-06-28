@@ -10,10 +10,44 @@ on:
         description: 'Release tag (e.g., v1.0.0)'
         required: true
 
+env:
+  # 统一用环境变量驱动 tag
+  RELEASE_TAG: ${{ github.ref_type == 'tag' && github.ref_name || inputs.tag }}
+
 jobs:
-  # Windows 构建（便携版 + 安装包）
+  # 版本解析：版本名来自 pubspec.yaml + 版本码从 git 历史自动计算
+  resolve:
+    name: Resolve Version
+    runs-on: ubuntu-latest
+    outputs:
+      version_name: ${{ steps.name.outputs.version_name }}
+      version_code: ${{ steps.code.outputs.version_code }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
+      - name: Read version name from pubspec.yaml
+        id: name
+        run: |
+          VER=$(grep '^version:' pubspec.yaml | sed 's/version: *//')
+          VERSION_NAME="${VER%+*}"
+          echo "version_name=$VERSION_NAME" >> $GITHUB_OUTPUT
+          echo "pubspec.yaml → version=$VERSION_NAME"
+
+      - name: Compute version code from git history
+        id: code
+        run: |
+          CODE=$((10001 + $(git rev-list --count HEAD)))
+          echo "version_code=$CODE" >> $GITHUB_OUTPUT
+          echo "git rev-list --count HEAD → version_code=$CODE"
+
+  # ===================================================================
+  # Windows 构建
+  # ===================================================================
   build-windows:
     name: Build Windows
+    needs: [resolve]
     runs-on: windows-latest
     steps:
       - uses: actions/checkout@v7
@@ -26,36 +60,54 @@ jobs:
 
       - run: flutter pub get
 
-      - run: flutter build windows --release
+      # 编译时注入版本号，实现 App UI 版本自动同步
+      - run: >-
+          flutter build windows --release
+          --dart-define=APP_VERSION=${{ needs.resolve.outputs.version_name }}
+          --dart-define=APP_BUILD_NUMBER=${{ needs.resolve.outputs.version_code }}
 
-      # 创建便携版 ZIP
+      # 版本化命名：项目名-v版本名_版本码-平台.格式
       - name: Create portable ZIP
         run: |
-          Compress-Archive -Path build/windows/x64/runner/Release/* -DestinationPath myriad-monitor-windows-portable.zip
+          Compress-Archive -Path build/windows/x64/runner/Release/* `
+            -DestinationPath "myriad-monitor-v${{ needs.resolve.outputs.version_name }}_${{ needs.resolve.outputs.version_code }}-windows-portable.zip"
 
-      # 创建安装包（使用 Inno Setup）
       - name: Install Inno Setup
+        run: choco install innosetup -y
+
+      # 同步 installer 版本号
+      - name: Update installer version
         run: |
-          choco install innosetup -y
+          (Get-Content windows\installer.iss) `
+            -replace 'AppVersion=.*', 'AppVersion=${{ needs.resolve.outputs.version_name }}' |
+          Set-Content windows\installer.iss
 
       - name: Build installer
         run: |
           & "C:\Program Files (x86)\Inno Setup 6\ISCC.exe" windows\installer.iss
 
+      - name: Rename installer
+        run: |
+          $installer = Get-ChildItem build/windows/installer/*.exe | Select-Object -First 1
+          Rename-Item $installer.FullName "myriad-monitor-v${{ needs.resolve.outputs.version_name }}_${{ needs.resolve.outputs.version_code }}-windows-installer.exe"
+
       - uses: actions/upload-artifact@v7
         with:
           name: windows-portable
-          path: myriad-monitor-windows-portable.zip
+          path: myriad-monitor-v*_*-windows-portable.zip
 
       - uses: actions/upload-artifact@v7
         with:
           name: windows-installer
-          path: build/windows/installer/*.exe
+          path: myriad-monitor-v*_*-windows-installer.exe
           if-no-files-found: warn
 
-  # macOS 构建（DMG 安装包）
+  # ===================================================================
+  # macOS 构建
+  # ===================================================================
   build-macos:
     name: Build macOS
+    needs: [resolve]
     runs-on: macos-latest
     steps:
       - uses: actions/checkout@v7
@@ -68,28 +120,33 @@ jobs:
 
       - run: flutter pub get
 
-      - run: flutter build macos --release
+      - run: >-
+          flutter build macos --release
+          --dart-define=APP_VERSION=${{ needs.resolve.outputs.version_name }}
+          --dart-define=APP_BUILD_NUMBER=${{ needs.resolve.outputs.version_code }}
 
-      # 创建 DMG
       - name: Create DMG
         run: |
-          # 查找 .app 文件
           APP_PATH=$(find build/macos -name "*.app" -type d | head -1)
           if [ -z "$APP_PATH" ]; then
             echo "Error: .app file not found"
             exit 1
           fi
           echo "Found app at: $APP_PATH"
-          hdiutil create -volname "Myriad Monitor" -srcfolder "$APP_PATH" -ov -format UDZO myriad-monitor-macos.dmg
+          hdiutil create -volname "Myriad Monitor" -srcfolder "$APP_PATH" -ov -format UDZO \
+            "myriad-monitor-v${{ needs.resolve.outputs.version_name }}_${{ needs.resolve.outputs.version_code }}-macos.dmg"
 
       - uses: actions/upload-artifact@v7
         with:
           name: macos-dmg
-          path: myriad-monitor-macos.dmg
+          path: myriad-monitor-v*_*-macos.dmg
 
+  # ===================================================================
   # Linux 构建
+  # ===================================================================
   build-linux:
     name: Build Linux
+    needs: [resolve]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
@@ -104,22 +161,27 @@ jobs:
 
       - run: flutter pub get
 
-      - run: flutter build linux --release
+      - run: >-
+          flutter build linux --release
+          --dart-define=APP_VERSION=${{ needs.resolve.outputs.version_name }}
+          --dart-define=APP_BUILD_NUMBER=${{ needs.resolve.outputs.version_code }}
 
-      # 创建 tar.gz
       - name: Create tar.gz
         run: |
           cd build/linux/x64/release/bundle/
-          tar -czf ../../../../../myriad-monitor-linux.tar.gz *
+          tar -czf "../../../../../myriad-monitor-v${{ needs.resolve.outputs.version_name }}_${{ needs.resolve.outputs.version_code }}-linux.tar.gz" *
 
       - uses: actions/upload-artifact@v7
         with:
           name: linux-bundle
-          path: myriad-monitor-linux.tar.gz
+          path: myriad-monitor-v*_*-linux.tar.gz
 
-  # Android 构建（正式版 + 测试版）
+  # ===================================================================
+  # Android 构建
+  # ===================================================================
   build-android:
     name: Build Android
+    needs: [resolve]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
@@ -137,37 +199,50 @@ jobs:
 
       - run: flutter pub get
 
-      # 解码签名密钥
       - name: Decode keystore
-        run: |
-          echo "${{ secrets.ANDROID_KEYSTORE_BASE64 }}" | base64 --decode > android/app/key.jks
+        run: echo "${{ secrets.ANDROID_KEYSTORE_BASE64 }}" | base64 --decode > android/app/key.jks
 
-      # 构建正式版 APK
       - name: Build release APK
-        run: flutter build apk --release
+        run: >-
+          flutter build apk --release
+          --dart-define=APP_VERSION=${{ needs.resolve.outputs.version_name }}
+          --dart-define=APP_BUILD_NUMBER=${{ needs.resolve.outputs.version_code }}
         env:
           KEY_STORE_PASSWORD: ${{ secrets.KEY_STORE_PASSWORD }}
           KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
           KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
           KEY_PATH: key.jks
 
-      # 构建测试版 APK（使用不同的包名）
       - name: Build debug APK
-        run: flutter build apk --debug
+        run: >-
+          flutter build apk --debug
+          --dart-define=APP_VERSION=${{ needs.resolve.outputs.version_name }}
+          --dart-define=APP_BUILD_NUMBER=${{ needs.resolve.outputs.version_code }}
+
+      # 项目名-v版本名_版本码-平台.apk
+      - name: Rename APKs
+        run: |
+          VER="${{ needs.resolve.outputs.version_name }}"
+          CODE="${{ needs.resolve.outputs.version_code }}"
+          mv build/app/outputs/flutter-apk/app-release.apk "myriad-monitor-v${VER}_${CODE}-android-release.apk"
+          mv build/app/outputs/flutter-apk/app-debug.apk "myriad-monitor-v${VER}_${CODE}-android-debug.apk"
 
       - uses: actions/upload-artifact@v7
         with:
           name: android-release
-          path: build/app/outputs/flutter-apk/app-release.apk
+          path: myriad-monitor-v*_*-android-release.apk
 
       - uses: actions/upload-artifact@v7
         with:
           name: android-debug
-          path: build/app/outputs/flutter-apk/app-debug.apk
+          path: myriad-monitor-v*_*-android-debug.apk
 
-  # iOS 构建（仅编译，不签名）
+  # ===================================================================
+  # iOS 构建
+  # ===================================================================
   build-ios:
     name: Build iOS
+    needs: [resolve]
     runs-on: macos-latest
     steps:
       - uses: actions/checkout@v7
@@ -180,17 +255,22 @@ jobs:
 
       - run: flutter pub get
 
-      - run: flutter build ios --release --no-codesign
+      - run: >-
+          flutter build ios --release --no-codesign
+          --dart-define=APP_VERSION=${{ needs.resolve.outputs.version_name }}
+          --dart-define=APP_BUILD_NUMBER=${{ needs.resolve.outputs.version_code }}
 
       - uses: actions/upload-artifact@v7
         with:
           name: ios-release
           path: build/ios/iphoneos/
 
+  # ===================================================================
   # 创建 GitHub Release
+  # ===================================================================
   create-release:
     name: Create Release
-    needs: [build-windows, build-macos, build-linux, build-android, build-ios]
+    needs: [resolve, build-windows, build-macos, build-linux, build-android, build-ios]
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -202,19 +282,27 @@ jobs:
       - name: Resolve release tag
         id: tag
         run: |
-          # workflow_dispatch 时使用用户输入的 tag，tag push 时使用 ref_name
-          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
-            TAG="${{ inputs.tag }}"
-          else
-            TAG="${{ github.ref_name }}"
-          fi
+          TAG="${{ env.RELEASE_TAG }}"
           echo "tag=$TAG" >> $GITHUB_OUTPUT
           echo "Resolved tag: $TAG (event: ${{ github.event_name }})"
+
+      # 验证 tag 与 pubspec.yaml 版本号一致
+      - name: Validate tag matches pubspec version
+        run: |
+          TAG="${{ steps.tag.outputs.tag }}"
+          EXPECTED="v${{ needs.resolve.outputs.version_name }}"
+          if [ "$TAG" != "$EXPECTED" ]; then
+            echo "❌ Tag mismatch!"
+            echo "   Tag:     $TAG"
+            echo "   Expected: $EXPECTED (from pubspec.yaml)"
+            echo "   Please ensure the tag matches pubspec.yaml version."
+            exit 1
+          fi
+          echo "✓ Tag '$TAG' matches pubspec.yaml version"
 
       - name: Create git tag if needed
         run: |
           TAG="${{ steps.tag.outputs.tag }}"
-          # 手动触发时，确保 tag 存在（指向当前 HEAD）
           if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
             if ! git rev-parse "$TAG" >/dev/null 2>&1; then
               echo "Creating tag: $TAG"
@@ -232,61 +320,38 @@ jobs:
         id: changelog
         run: |
           TAG="${{ steps.tag.outputs.tag }}"
-          # 获取上一个 tag（排除当前 tag）
           PREV_TAG=$(git tag --sort=-v:refname | grep -v "^${TAG}$" | head -1 || echo "")
           echo "prev_tag=$PREV_TAG" >> $GITHUB_OUTPUT
+
           if [ -z "$PREV_TAG" ]; then
             echo "changelog=Initial release" >> $GITHUB_OUTPUT
+            echo "full_changelog=https://github.com/$GITHUB_REPOSITORY/commits/$TAG" >> $GITHUB_OUTPUT
           else
-            # 生成 changelog
             CHANGELOG=$(git log ${PREV_TAG}..HEAD --pretty=format:"- %s (%h)" --no-merges)
             echo "changelog<<EOF" >> $GITHUB_OUTPUT
             echo "$CHANGELOG" >> $GITHUB_OUTPUT
             echo "EOF" >> $GITHUB_OUTPUT
+            echo "full_changelog=https://github.com/$GITHUB_REPOSITORY/compare/${PREV_TAG}...${TAG}" >> $GITHUB_OUTPUT
           fi
 
+      # Release：纯 tag 标题 + What's Changed + Full Changelog
       - name: Create Release
         uses: softprops/action-gh-release@v3
         with:
           tag_name: ${{ steps.tag.outputs.tag }}
           name: ${{ steps.tag.outputs.tag }}
           body: |
-            ## 万镜 Myriad ${{ steps.tag.outputs.tag }}
-
-            去中心化的跨平台系统监控面板
-
-            ## 更新内容
+            ## What's Changed
 
             ${{ steps.changelog.outputs.changelog }}
 
-            ## 下载
-
-            | 平台 | 文件 | 说明 |
-            |------|------|------|
-            | Windows | `myriad-monitor-windows-portable.zip` | 便携版，解压即用 |
-            | Windows | `myriad-monitor-windows-installer.exe` | 安装包 |
-            | macOS | `myriad-monitor-macos.dmg` | DMG 安装包 |
-            | Linux | `myriad-monitor-linux.tar.gz` | tar.gz 包 |
-            | Android | `app-release.apk` | 正式版 (com.chendusk.myriadmonitor) |
-            | Android | `app-debug.apk` | 测试版 (com.chendusk.myriadmonitor.dev) |
-
-            ## 系统要求
-
-            - **Windows**: Windows 10+
-            - **macOS**: macOS 10.15+
-            - **Linux**: X11/Wayland
-            - **Android**: Android 6.0+
-            - **iOS**: iOS 12.0+
-
-            ---
-
-            **Full Changelog**: https://github.com/${{ github.repository }}/commits/${{ steps.tag.outputs.tag }}
+            **Full Changelog**: ${{ steps.changelog.outputs.full_changelog }}
           files: |
-            windows-portable/myriad-monitor-windows-portable.zip
+            windows-portable/*.zip
             windows-installer/*.exe
-            macos-dmg/myriad-monitor-macos.dmg
-            linux-bundle/myriad-monitor-linux.tar.gz
-            android-release/app-release.apk
-            android-debug/app-debug.apk
+            macos-dmg/*.dmg
+            linux-bundle/*.tar.gz
+            android-release/*.apk
+            android-debug/*.apk
           draft: false
           prerelease: false

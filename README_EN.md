@@ -129,7 +129,9 @@ flutter build ios         # iOS
 
 ## Download
 
-Visit the [Releases](https://github.com/mcxiaochenn/myriad-monitor/releases) page to download the latest version:
+Visit the [Releases](https://github.com/mcxiaochenn/myriad-monitor/releases) page to download the latest version.
+
+All release files follow a unified naming convention: `myriad-monitor-v{version_name}_{version_code}-{platform}.{format}`, e.g. `myriad-monitor-v1.0.0_1-windows-portable.zip`. Version name is read from `pubspec.yaml`, version code is auto-computed from git commit history.
 
 | Platform | Format | Description |
 |------|------|------|

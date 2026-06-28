@@ -66,10 +66,12 @@ class AppConfigConstants {
   static const String appName = 'Myriad Monitor';
 
   /// 应用版本号
-  static const String appVersion = '1.0.0';
+  /// 编译时通过 --dart-define=APP_VERSION=x.y.z 注入，自动与 pubspec.yaml 同步
+  static const String appVersion = String.fromEnvironment('APP_VERSION', defaultValue: 'dev');
 
-  /// 应用构建号
-  static const String appBuildNumber = '1';
+  /// 应用构建号（对应 Android versionCode）
+  /// 编译时通过 --dart-define=APP_BUILD_NUMBER=N 注入，自动与 pubspec.yaml 同步
+  static const String appBuildNumber = String.fromEnvironment('APP_BUILD_NUMBER', defaultValue: '0');
 
   /// 应用包名
   static const String packageName = 'com.myriad.monitor';

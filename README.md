@@ -129,7 +129,9 @@ flutter build ios         # iOS
 
 ## 下载
 
-前往 [Releases](https://github.com/mcxiaochenn/myriad-monitor/releases) 页面下载最新版本：
+前往 [Releases](https://github.com/mcxiaochenn/myriad-monitor/releases) 页面下载最新版本。
+
+所有发布文件遵循统一命名：`myriad-monitor-v{版本名}_{版本码}-{平台}.{格式}`，如 `myriad-monitor-v1.0.0_1-windows-portable.zip`。版本名从 `pubspec.yaml` 读取，版本码根据 git 提交历史自动计算。
 
 | 平台 | 格式 | 说明 |
 |------|------|------|
