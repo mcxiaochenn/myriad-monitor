@@ -29,6 +29,7 @@
 | **Real-time Monitoring** | CPU, memory, disk, network metrics with live chart rendering |
 | **Auto Discovery** | UDP multicast protocol for automatic LAN device discovery |
 | **Internationalization** | Chinese and English support, follows system language |
+| **Theme Switching** | Light / Dark / Auto (follow system), preference persisted |
 | **Visual Experience** | Gaussian blur backgrounds, continuous curvature rounded corners, smooth animations |
 
 ## Architecture
@@ -39,8 +40,8 @@
 │  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐  │
 │  │  Server       │  │  Discovery   │  │  Client       │  │
 │  │ · System Info │  │ · UDP        │  │ · Device List │  │
-│  │ · WebSocket   │  │ · Discovery  │  │ · Live Charts │  │
-│  │ · Data Push   │  │ · Heartbeat  │  │ · Visualization│ │
+│  │ · HTTP API    │  │ · Discovery  │  │ · Live Charts │  │
+│  │ · JSON        │  │ · Heartbeat  │  │ · Visualization│ │
 │  └──────┬───────┘  └──────┬───────┘  └──────┬───────┘  │
 │         └─────────────────┴─────────────────┘           │
 │                   Local / Network                       │
@@ -50,32 +51,6 @@ Device A (Myriad) ◄──── IP Direct ────► Device B (Myriad)
    Server+Client                      Server+Client
 ```
 
-## Pages
-
-**Home**
-- Discovered device card list
-- Sort by: add time, name, online status, IP address
-- Gaussian blur background + continuous curvature rounded cards
-- Tap to view device details
-
-**Server**
-- Local device info (device name, OS, hostname)
-- WebSocket service status
-- Network info (local IP address)
-- Connected client count
-
-**Settings**
-- Server port, address, push interval configuration
-- Device discovery toggle
-- Language switch (Follow System / Chinese / English)
-- Data cleanup
-
-**About**
-- App info and version
-- Feature introduction
-- Tech stack (clickable links)
-- Developer info (clickable links)
-
 ## Tech Stack
 
 | Layer | Solution |
@@ -83,7 +58,7 @@ Device A (Myriad) ◄──── IP Direct ────► Device B (Myriad)
 | **UI Framework** | Flutter 3.x |
 | **State Management** | Riverpod |
 | **System Info** | `system_info2` / `dart:ffi` native API calls |
-| **Device Communication** | WebSocket (`shelf` + `web_socket_channel`) |
+| **Device Communication** | HTTP API (`shelf`), SHA256 token auth, client polling |
 | **Device Discovery** | UDP Multicast (`dart:io` RawDatagramSocket) |
 | **Charts** | `fl_chart` |
 | **Blur Effects** | `BackdropFilter` + `ImageFilter.blur` |
@@ -181,7 +156,7 @@ lib/
 
 - [x] Basic framework
 - [x] System info collector (Windows)
-- [x] WebSocket communication layer
+- [x] HTTP communication layer (SHA256 token auth)
 - [x] Device list UI
 - [x] Device detail UI
 - [x] Real-time chart rendering
@@ -191,6 +166,8 @@ lib/
 - [x] Server config page
 - [x] About page
 - [x] Device data persistence
+- [x] Light/Dark/Auto theme switching
+- [x] SHA256 access token management
 - [ ] System info collector (macOS/Linux/Android/iOS)
 - [ ] Device detail page data integration
 - [ ] Historical data storage and charts
