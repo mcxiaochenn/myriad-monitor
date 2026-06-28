@@ -1,6 +1,6 @@
 [Setup]
 AppName=Myriad Monitor
-AppVersion=1.0.0
+AppVersion=0.0.1
 AppPublisher=辰渊尘
 AppPublisherURL=https://github.com/mcxiaochenn/myriad-monitor
 AppSupportURL=https://github.com/mcxiaochenn/myriad-monitor/issues

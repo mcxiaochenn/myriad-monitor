@@ -1,7 +1,7 @@
 name: myriad_monitor
 description: 系统资源监控工具 - 实时监控 CPU、内存、磁盘、网络等系统信息
 publish_to: 'none'
-version: 1.0.0+1
+version: 0.0.1+0
 
 environment:
   sdk: '>=3.0.0 <4.0.0'
