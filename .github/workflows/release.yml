@@ -205,6 +205,7 @@ jobs:
       - run: flutter pub get
 
       # 固定签名：从 GitHub Secrets 解码 keystore 并写入凭据文件
+      # 同时防御性清理 flutter create 可能重新添加的 android.newDsl=false
       - name: Setup signing
         run: |
           echo "${{ secrets.ANDROID_KEYSTORE_BASE64 }}" | base64 --decode > android/app/upload-keystore.jks
@@ -212,8 +213,9 @@ jobs:
           storePassword=${{ secrets.KEY_STORE_PASSWORD }}
           keyPassword=${{ secrets.KEY_PASSWORD }}
           keyAlias=${{ secrets.KEY_ALIAS }}
-          storeFile=app/upload-keystore.jks
+          storeFile=upload-keystore.jks
           EOF
+          sed -i '/^android\.newDsl=/d' android/gradle.properties
 
       - name: Build release APK
         run: >-
