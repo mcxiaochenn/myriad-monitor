@@ -191,9 +191,16 @@ class AppLocalizations {
       locale.languageCode == 'zh' ? '删除所有监控历史记录' : 'Delete all monitoring history';
 
   String get language => locale.languageCode == 'zh' ? '语言' : 'Language';
-  String get systemDefault => locale.languageCode == 'zh' ? '跟随系统' : 'System default';
+  String get systemDefault => locale.languageCode == 'zh' ? '自动（跟随系统）' : 'Auto (follow system)';
   String get chinese => locale.languageCode == 'zh' ? '中文' : 'Chinese';
   String get english => locale.languageCode == 'zh' ? '英文' : 'English';
+
+  // ==================== 主题 ====================
+
+  String get appearance => locale.languageCode == 'zh' ? '外观' : 'Appearance';
+  String get theme => locale.languageCode == 'zh' ? '主题' : 'Theme';
+  String get lightTheme => locale.languageCode == 'zh' ? '浅色模式' : 'Light';
+  String get darkTheme => locale.languageCode == 'zh' ? '深色模式' : 'Dark';
 
   String get confirmClearData =>
       locale.languageCode == 'zh' ? '确定要删除所有已保存的设备信息吗？此操作不可撤销。' :

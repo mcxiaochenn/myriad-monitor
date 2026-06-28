@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:hive_flutter/hive_flutter.dart';
+import 'app/app.dart';
+import 'core/theme_provider.dart';
 import 'features/home/home_page.dart';
 import 'features/server/server_page.dart';
 import 'features/settings/settings_page.dart';
@@ -35,23 +37,16 @@ class MyApp extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final locale = ref.watch(localeProvider);
+    final themeMode = ref.watch(themeModeProvider);
 
     return MaterialApp(
       title: 'Myriad Monitor',
-      // 暗色主题配置
-      theme: ThemeData(
-        useMaterial3: true,
-        colorSchemeSeed: Colors.blue,
-        brightness: Brightness.dark,
-      ),
-      // 明亮主题配置
-      darkTheme: ThemeData(
-        useMaterial3: true,
-        colorSchemeSeed: Colors.blue,
-        brightness: Brightness.light,
-      ),
-      // 跟随系统主题
-      themeMode: ThemeMode.system,
+      // 浅色主题
+      theme: AppTheme.lightTheme,
+      // 深色主题
+      darkTheme: AppTheme.darkTheme,
+      // 主题模式（自动/浅色/深色）
+      themeMode: themeMode.flutterThemeMode,
       // 国际化配置
       locale: locale,
       localizationsDelegates: const [

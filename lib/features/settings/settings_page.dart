@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../../core/storage/device_storage.dart';
+import '../../core/theme_provider.dart';
 import '../../l10n/app_localizations.dart';
 import '../../l10n/locale_provider.dart';
 
@@ -222,6 +223,18 @@ class SettingsPage extends ConsumerWidget {
 
           const Divider(),
 
+          // 外观主题配置区域
+          _buildSectionHeader(context, l10n.appearance),
+          ListTile(
+            leading: const Icon(Icons.palette_outlined),
+            title: Text(l10n.theme),
+            subtitle: Text(_getThemeName(ref, l10n)),
+            trailing: const Icon(Icons.chevron_right),
+            onTap: () => _showThemeDialog(context, ref, l10n),
+          ),
+
+          const Divider(),
+
           // 数据存储配置区域
           _buildSectionHeader(context, l10n.dataStorage),
           ListTile(
@@ -252,6 +265,76 @@ class SettingsPage extends ConsumerWidget {
       case LanguageMode.english:
         return l10n.english;
     }
+  }
+
+  /// 获取当前主题模式名称
+  String _getThemeName(WidgetRef ref, AppLocalizations l10n) {
+    final mode = ref.watch(themeModeProvider);
+    switch (mode) {
+      case ThemeModeOption.system:
+        return l10n.systemDefault;
+      case ThemeModeOption.light:
+        return l10n.lightTheme;
+      case ThemeModeOption.dark:
+        return l10n.darkTheme;
+    }
+  }
+
+  /// 显示主题选择对话框
+  void _showThemeDialog(
+    BuildContext context,
+    WidgetRef ref,
+    AppLocalizations l10n,
+  ) {
+    final currentMode = ref.read(themeModeProvider);
+
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text(l10n.theme),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            RadioListTile<ThemeModeOption>(
+              title: Text(l10n.systemDefault),
+              subtitle: Icon(Icons.brightness_auto, size: 20),
+              value: ThemeModeOption.system,
+              groupValue: currentMode,
+              onChanged: (value) {
+                if (value != null) {
+                  ref.read(themeModeProvider.notifier).setThemeMode(value);
+                  Navigator.pop(context);
+                }
+              },
+            ),
+            RadioListTile<ThemeModeOption>(
+              title: Text(l10n.lightTheme),
+              subtitle: const Icon(Icons.light_mode, size: 20),
+              value: ThemeModeOption.light,
+              groupValue: currentMode,
+              onChanged: (value) {
+                if (value != null) {
+                  ref.read(themeModeProvider.notifier).setThemeMode(value);
+                  Navigator.pop(context);
+                }
+              },
+            ),
+            RadioListTile<ThemeModeOption>(
+              title: Text(l10n.darkTheme),
+              subtitle: const Icon(Icons.dark_mode, size: 20),
+              value: ThemeModeOption.dark,
+              groupValue: currentMode,
+              onChanged: (value) {
+                if (value != null) {
+                  ref.read(themeModeProvider.notifier).setThemeMode(value);
+                  Navigator.pop(context);
+                }
+              },
+            ),
+          ],
+        ),
+      ),
+    );
   }
 
   /// 显示语言选择对话框
