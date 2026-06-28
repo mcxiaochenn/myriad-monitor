@@ -111,24 +111,46 @@ jobs:
 
       - run: flutter pub get
 
+      # 固定签名：从 GitHub Secrets 解码 keystore 并写入凭据文件
+      - name: Setup signing
+        run: |
+          echo "${{ secrets.ANDROID_KEYSTORE_BASE64 }}" | base64 --decode > android/app/upload-keystore.jks
+          cat <<EOF > android/key.properties
+          storePassword=${{ secrets.KEY_STORE_PASSWORD }}
+          keyPassword=${{ secrets.KEY_PASSWORD }}
+          keyAlias=${{ secrets.KEY_ALIAS }}
+          storeFile=app/upload-keystore.jks
+          EOF
+
       - run: >-
           flutter build apk --release
           --dart-define=APP_VERSION=${{ env.APP_VERSION }}
           --dart-define=APP_BUILD_NUMBER=${{ env.APP_BUILD_NUMBER }}
 
-      - name: Rename APK
+      - run: >-
+          flutter build apk --debug
+          --dart-define=APP_VERSION=${{ env.APP_VERSION }}
+          --dart-define=APP_BUILD_NUMBER=${{ env.APP_BUILD_NUMBER }}
+
+      - name: Rename APKs
         run: |
           if [ "$APP_BUILD_NUMBER" != "0" ]; then
             PREFIX="myriad-monitor-v${APP_VERSION}_${APP_BUILD_NUMBER}"
           else
             PREFIX="myriad-monitor-dev"
           fi
-          mv build/app/outputs/flutter-apk/app-release.apk "${PREFIX}-android.apk"
+          mv build/app/outputs/flutter-apk/app-release.apk "${PREFIX}-android-release.apk"
+          mv build/app/outputs/flutter-apk/app-debug.apk "${PREFIX}-android-debug.apk"
 
       - uses: actions/upload-artifact@v7
         with:
           name: android-release
-          path: myriad-monitor-*-android.apk
+          path: myriad-monitor-*-android-release.apk
+
+      - uses: actions/upload-artifact@v7
+        with:
+          name: android-debug
+          path: myriad-monitor-*-android-debug.apk
 
   # ===================================================================
   # macOS 构建
