@@ -265,6 +265,12 @@ jobs:
 
       - run: flutter create --project-name myriad_monitor --platforms ios .
 
+      # mobile_scanner 要求 iOS ≥15.5
+      - name: Bump iOS deployment target
+        run: |
+          sed -i '' 's/platform :ios.*/platform :ios, "15.5"/' ios/Podfile
+          grep -q 'platform :ios' ios/Podfile || echo 'platform :ios, "15.5"' >> ios/Podfile
+
       - run: flutter pub get
 
       - run: >-
