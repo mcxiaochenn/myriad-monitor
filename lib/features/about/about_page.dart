@@ -46,8 +46,8 @@ class _AboutPageState extends State<AboutPage> {
                         MaterialPageRoute(builder: (_) => const DeveloperPage()),
                       );
                     }
-                    // 3 秒无连击则重置
-                    Future.delayed(const Duration(seconds: 3), () {
+                    // 5 秒无连击则重置
+                    Future.delayed(const Duration(seconds: 5), () {
                       if (mounted) _logoTapCount = 0;
                     });
                   },
