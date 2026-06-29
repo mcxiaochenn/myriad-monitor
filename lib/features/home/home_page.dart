@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:io';
 import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -10,8 +11,8 @@ import '../../l10n/app_localizations.dart';
 import '../settings/settings_page.dart';
 import '../detail/detail_page.dart';
 import 'device_card.dart';
+import 'scan_page.dart';
 
-/// 设备管理器 Provider
 final deviceManagerProvider = Provider<DeviceManager>((ref) {
   final manager = DeviceManager();
   manager.loadDevices();
@@ -20,124 +21,44 @@ final deviceManagerProvider = Provider<DeviceManager>((ref) {
   return manager;
 });
 
-/// 设备发现集成服务 Provider
 final discoveryIntegrationProvider = Provider<DiscoveryIntegration>((ref) {
   final deviceManager = ref.read(deviceManagerProvider);
   final config = ref.read(serverConfigProvider);
-
-  final discoveryService = UdpDiscoveryService(
-    deviceName: config.deviceName,
-    servicePort: config.port,
-  );
-
-  final integration = DiscoveryIntegration(
-    discoveryService: discoveryService,
-    deviceManager: deviceManager,
-  );
-
+  final discoveryService = UdpDiscoveryService(deviceName: config.deviceName, servicePort: config.port);
+  final integration = DiscoveryIntegration(discoveryService: discoveryService, deviceManager: deviceManager);
   integration.start();
-  ref.onDispose(() {
-    discoveryService.dispose();
-    integration.dispose();
-  });
+  ref.onDispose(() { discoveryService.dispose(); integration.dispose(); });
   return integration;
 });
 
-/// 排序方式枚举
-enum SortType {
-  /// 按添加时间排序
-  time,
+enum SortType { time, name, status, ip }
+enum SortDirection { ascending, descending }
 
-  /// 按名称排序
-  name,
+final sortStateProvider = StateProvider<SortState>((ref) => SortState());
 
-  /// 按在线状态排序
-  status,
-
-  /// 按 IP 地址排序
-  ip,
-}
-
-/// 排序方向
-enum SortDirection {
-  /// 升序
-  ascending,
-
-  /// 降序
-  descending,
-}
-
-/// 排序状态 Provider
-final sortStateProvider = StateProvider<SortState>((ref) {
-  return SortState();
-});
-
-/// 排序状态
 class SortState {
-  final SortType type;
-  final SortDirection direction;
-
-  SortState({
-    this.type = SortType.time,
-    this.direction = SortDirection.descending,
-  });
-
-  SortState copyWith({
-    SortType? type,
-    SortDirection? direction,
-  }) {
-    return SortState(
-      type: type ?? this.type,
-      direction: direction ?? this.direction,
-    );
-  }
+  final SortType type; final SortDirection direction;
+  SortState({this.type = SortType.time, this.direction = SortDirection.descending});
+  SortState copyWith({SortType? type, SortDirection? direction}) => SortState(type: type ?? this.type, direction: direction ?? this.direction);
 }
 
-/// 设备列表 Provider（响应式 + 排序）
-final deviceListProvider =
-    StateNotifierProvider<DeviceListNotifier, List<ManagedDevice>>((ref) {
+final deviceListProvider = StateNotifierProvider<DeviceListNotifier, List<ManagedDevice>>((ref) {
   final manager = ref.watch(deviceManagerProvider);
   return DeviceListNotifier(manager);
 });
 
-/// 设备列表状态管理
 class DeviceListNotifier extends StateNotifier<List<ManagedDevice>> {
   final DeviceManager _manager;
-  final List<StreamSubscription> _subscriptions = [];
-
+  final List<StreamSubscription> _subs = [];
   DeviceListNotifier(this._manager) : super(_manager.devices) {
-    _subscriptions.add(
-      _manager.devicesChangedStream.listen((devices) {
-        state = List.unmodifiable(devices);
-      }),
-    );
-    _subscriptions.add(
-      _manager.deviceStatusStream.listen((_) {
-        state = List.unmodifiable(_manager.devices);
-      }),
-    );
+    _subs.add(_manager.devicesChangedStream.listen((devices) { state = List.unmodifiable(devices); }));
+    _subs.add(_manager.deviceStatusStream.listen((_) { state = List.unmodifiable(_manager.devices); }));
   }
-
-  void addDevice(ManagedDevice device) {
-    _manager.addDevice(device);
-    state = List.unmodifiable(_manager.devices);
-  }
-
-  void removeDevice(String deviceId) {
-    _manager.removeDevice(deviceId);
-    state = List.unmodifiable(_manager.devices);
-  }
-
-  @override
-  void dispose() {
-    for (final sub in _subscriptions) {
-      sub.cancel();
-    }
-    super.dispose();
-  }
+  void addDevice(ManagedDevice d) { _manager.addDevice(d); state = List.unmodifiable(_manager.devices); }
+  void removeDevice(String id) { _manager.removeDevice(id); state = List.unmodifiable(_manager.devices); }
+  @override void dispose() { for (final s in _subs) { s.cancel(); } super.dispose(); }
 }
 
-/// 设备列表主页
 class HomePage extends ConsumerWidget {
   const HomePage({super.key});
 
@@ -146,711 +67,204 @@ class HomePage extends ConsumerWidget {
     final devices = ref.watch(deviceListProvider);
     final sortState = ref.watch(sortStateProvider);
     final l10n = AppLocalizations.of(context);
-
-    // 排序设备列表
-    final sortedDevices = _sortDevices(devices, sortState);
+    final sorted = _sort(devices, sortState);
 
     return Scaffold(
       appBar: AppBar(
-        title: Text(l10n.deviceList),
-        centerTitle: true,
+        title: Text(l10n.deviceList), centerTitle: true,
         actions: [
-          // 排序按钮
-          IconButton(
-            icon: const Icon(Icons.sort),
-            onPressed: () => _showSortDialog(context, ref, l10n),
-            tooltip: l10n.sortDevices,
-          ),
-          // 添加/发现设备菜单
-          PopupMenuButton<String>(
-            icon: const Icon(Icons.add_circle_outline),
-            tooltip: l10n.addDevice,
-            onSelected: (value) {
-              switch (value) {
-                case 'add':
-                  _showAddDeviceDialog(context, ref, l10n);
-                  break;
-                case 'discover':
-                  _showDiscoveredDevicesDialog(context, ref, l10n);
-                  break;
-              }
-            },
-            itemBuilder: (context) => [
-              PopupMenuItem(
-                value: 'add',
-                child: ListTile(
-                  leading: const Icon(Icons.add),
-                  title: Text(l10n.addDevice),
-                  subtitle: Text(l10n.addDeviceDesc),
-                  contentPadding: EdgeInsets.zero,
-                ),
-              ),
-              PopupMenuItem(
-                value: 'discover',
-                child: ListTile(
-                  leading: const Icon(Icons.search),
-                  title: Text(l10n.discoverDevice),
-                  subtitle: Text(l10n.discoverDeviceDesc),
-                  contentPadding: EdgeInsets.zero,
-                ),
-              ),
-            ],
-          ),
+          IconButton(icon: const Icon(Icons.sort), onPressed: () => _showSort(context, ref, l10n), tooltip: l10n.sortDevices),
+          PopupMenuButton<String>(icon: const Icon(Icons.add_circle_outline), tooltip: l10n.addDevice, onSelected: (v) {
+            switch (v) {
+              case 'add': _showAdd(context, ref, l10n);
+              case 'scan': _scan(context, ref, l10n);
+              case 'discover': _showDiscover(context, ref, l10n);
+            }
+          }, itemBuilder: (ctx) => [
+            PopupMenuItem(value: 'add', child: ListTile(leading: const Icon(Icons.add), title: Text(l10n.addDevice), subtitle: Text(l10n.addDeviceDesc), contentPadding: EdgeInsets.zero)),
+            PopupMenuItem(value: 'scan', child: ListTile(leading: const Icon(Icons.qr_code_scanner), title: Text(l10n.scanAddDevice), subtitle: Text(l10n.scanAddDeviceDesc), contentPadding: EdgeInsets.zero)),
+            PopupMenuItem(value: 'discover', child: ListTile(leading: const Icon(Icons.search), title: Text(l10n.discoverDevice), subtitle: Text(l10n.discoverDeviceDesc), contentPadding: EdgeInsets.zero)),
+          ]),
         ],
       ),
-      body: Stack(
-        children: [
-          _buildBlurredBackground(context),
-          _buildDeviceList(context, ref, sortedDevices, l10n),
-        ],
-      ),
+      body: Stack(children: [_blurBg(context), _deviceList(context, ref, sorted, l10n)]),
     );
   }
 
-  /// 排序设备列表
-  List<ManagedDevice> _sortDevices(List<ManagedDevice> devices, SortState sortState) {
-    final sorted = List<ManagedDevice>.from(devices);
-
-    switch (sortState.type) {
-      case SortType.time:
-        sorted.sort((a, b) {
-          final aTime = a.discoveredAt;
-          final bTime = b.discoveredAt;
-          return sortState.direction == SortDirection.ascending
-              ? aTime.compareTo(bTime)
-              : bTime.compareTo(aTime);
-        });
-      case SortType.name:
-        sorted.sort((a, b) {
-          return sortState.direction == SortDirection.ascending
-              ? a.name.compareTo(b.name)
-              : b.name.compareTo(a.name);
-        });
-      case SortType.status:
-        sorted.sort((a, b) {
-          final aOnline = a.isOnline ? 0 : 1;
-          final bOnline = b.isOnline ? 0 : 1;
-          return sortState.direction == SortDirection.ascending
-              ? aOnline.compareTo(bOnline)
-              : bOnline.compareTo(aOnline);
-        });
-      case SortType.ip:
-        sorted.sort((a, b) {
-          return sortState.direction == SortDirection.ascending
-              ? a.ipAddress.compareTo(b.ipAddress)
-              : b.ipAddress.compareTo(a.ipAddress);
-        });
+  List<ManagedDevice> _sort(List<ManagedDevice> list, SortState s) {
+    final l = List<ManagedDevice>.from(list);
+    final asc = s.direction == SortDirection.ascending;
+    switch (s.type) {
+      case SortType.time: l.sort((a, b) => asc ? a.discoveredAt.compareTo(b.discoveredAt) : b.discoveredAt.compareTo(a.discoveredAt));
+      case SortType.name: l.sort((a, b) => asc ? a.name.compareTo(b.name) : b.name.compareTo(a.name));
+      case SortType.status: l.sort((a, b) => asc ? (a.isOnline ? 0 : 1).compareTo(b.isOnline ? 0 : 1) : (b.isOnline ? 0 : 1).compareTo(a.isOnline ? 0 : 1));
+      case SortType.ip: l.sort((a, b) => asc ? a.ipAddress.compareTo(b.ipAddress) : b.ipAddress.compareTo(a.ipAddress));
     }
-
-    return sorted;
+    return l;
   }
 
-  /// 显示排序对话框
-  void _showSortDialog(BuildContext context, WidgetRef ref, AppLocalizations l10n) {
-    final sortState = ref.read(sortStateProvider);
-
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: Text(l10n.sortDevices),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            // 排序方式
-            Text(
-              l10n.sortBy,
-              style: Theme.of(context).textTheme.titleSmall,
-            ),
-            const SizedBox(height: 8),
-            RadioListTile<SortType>(
-              title: Text(l10n.sortByTime),
-              value: SortType.time,
-              groupValue: sortState.type,
-              onChanged: (value) {
-                if (value != null) {
-                  ref.read(sortStateProvider.notifier).state =
-                      sortState.copyWith(type: value);
-                  Navigator.pop(context);
-                }
-              },
-            ),
-            RadioListTile<SortType>(
-              title: Text(l10n.sortByName),
-              value: SortType.name,
-              groupValue: sortState.type,
-              onChanged: (value) {
-                if (value != null) {
-                  ref.read(sortStateProvider.notifier).state =
-                      sortState.copyWith(type: value);
-                  Navigator.pop(context);
-                }
-              },
-            ),
-            RadioListTile<SortType>(
-              title: Text(l10n.sortByStatus),
-              value: SortType.status,
-              groupValue: sortState.type,
-              onChanged: (value) {
-                if (value != null) {
-                  ref.read(sortStateProvider.notifier).state =
-                      sortState.copyWith(type: value);
-                  Navigator.pop(context);
-                }
-              },
-            ),
-            RadioListTile<SortType>(
-              title: Text(l10n.sortByIp),
-              value: SortType.ip,
-              groupValue: sortState.type,
-              onChanged: (value) {
-                if (value != null) {
-                  ref.read(sortStateProvider.notifier).state =
-                      sortState.copyWith(type: value);
-                  Navigator.pop(context);
-                }
-              },
-            ),
-
-            const Divider(),
-
-            // 排序方向
-            Text(
-              l10n.sortDirection,
-              style: Theme.of(context).textTheme.titleSmall,
-            ),
-            const SizedBox(height: 8),
-            RadioListTile<SortDirection>(
-              title: Text(l10n.ascending),
-              value: SortDirection.ascending,
-              groupValue: sortState.direction,
-              onChanged: (value) {
-                if (value != null) {
-                  ref.read(sortStateProvider.notifier).state =
-                      sortState.copyWith(direction: value);
-                  Navigator.pop(context);
-                }
-              },
-            ),
-            RadioListTile<SortDirection>(
-              title: Text(l10n.descending),
-              value: SortDirection.descending,
-              groupValue: sortState.direction,
-              onChanged: (value) {
-                if (value != null) {
-                  ref.read(sortStateProvider.notifier).state =
-                      sortState.copyWith(direction: value);
-                  Navigator.pop(context);
-                }
-              },
-            ),
-          ],
-        ),
-      ),
-    );
+  void _showSort(BuildContext ctx, WidgetRef ref, AppLocalizations l10n) {
+    final s = ref.read(sortStateProvider);
+    showDialog(context: ctx, builder: (ctx) => AlertDialog(title: Text(l10n.sortDevices), content: Column(mainAxisSize: MainAxisSize.min, children: [
+      Text(l10n.sortBy, style: Theme.of(ctx).textTheme.titleSmall), const SizedBox(height: 8),
+      for (final t in [SortType.time, SortType.name, SortType.status, SortType.ip])
+        RadioListTile<SortType>(title: Text(_name(t, l10n)), value: t, groupValue: s.type, onChanged: (v) { if (v != null) { ref.read(sortStateProvider.notifier).state = s.copyWith(type: v); Navigator.pop(ctx); } }),
+      const Divider(), Text(l10n.sortDirection, style: Theme.of(ctx).textTheme.titleSmall), const SizedBox(height: 8),
+      RadioListTile<SortDirection>(title: Text(l10n.ascending), value: SortDirection.ascending, groupValue: s.direction, onChanged: (v) { if (v != null) { ref.read(sortStateProvider.notifier).state = s.copyWith(direction: v); Navigator.pop(ctx); } }),
+      RadioListTile<SortDirection>(title: Text(l10n.descending), value: SortDirection.descending, groupValue: s.direction, onChanged: (v) { if (v != null) { ref.read(sortStateProvider.notifier).state = s.copyWith(direction: v); Navigator.pop(ctx); } }),
+    ])));
   }
 
-  /// 显示添加设备对话框
-  void _showAddDeviceDialog(
-      BuildContext context, WidgetRef ref, AppLocalizations l10n) {
-    showDialog(
-      context: context,
-      builder: (context) => _AddDeviceDialog(
-        onAdd: (name, ip, port) {
-          final device = ManagedDevice(
-            deviceId: DateTime.now().millisecondsSinceEpoch.toString(),
-            name: name,
-            ipAddress: ip,
-            port: port,
-            onlineStatus: DeviceOnlineStatus.unknown,
-            discoveredAt: DateTime.now(),
-          );
-          ref.read(deviceListProvider.notifier).addDevice(device);
+  String _name(SortType t, AppLocalizations l) => switch (t) { SortType.time => l.sortByTime, SortType.name => l.sortByName, SortType.status => l.sortByStatus, SortType.ip => l.sortByIp };
 
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text(l10n.deviceAdded(name)),
-              duration: const Duration(seconds: 2),
-              behavior: SnackBarBehavior.floating,
-            ),
-          );
-        },
-        l10n: l10n,
-      ),
-    );
+  void _scan(BuildContext ctx, WidgetRef ref, AppLocalizations l10n) {
+    Navigator.of(ctx).push(MaterialPageRoute(builder: (_) => ScanPage(onDeviceFound: (device) {
+      ref.read(deviceListProvider.notifier).addDevice(device);
+      ScaffoldMessenger.of(ctx).showSnackBar(SnackBar(content: Text(l10n.deviceAdded(device.name)), behavior: SnackBarBehavior.floating));
+    })));
   }
 
-  /// 显示已发现设备对话框
-  void _showDiscoveredDevicesDialog(
-      BuildContext context, WidgetRef ref, AppLocalizations l10n) {
-    // 获取已发现但未添加的设备
-    final discoveryIntegration = ref.read(discoveryIntegrationProvider);
-    final existingDevices = ref.read(deviceListProvider);
-
-    showDialog(
-      context: context,
-      builder: (context) => _DiscoveredDevicesDialog(
-        discoveryIntegration: discoveryIntegration,
-        existingDevices: existingDevices,
-        onAdd: (device) {
-          ref.read(deviceListProvider.notifier).addDevice(device);
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text(l10n.deviceAdded(device.name)),
-              duration: const Duration(seconds: 2),
-              behavior: SnackBarBehavior.floating,
-            ),
-          );
-        },
-        l10n: l10n,
-      ),
-    );
+  void _showAdd(BuildContext ctx, WidgetRef ref, AppLocalizations l10n) {
+    final cfg = ref.read(serverConfigProvider);
+    showDialog(context: ctx, builder: (c) => _AddDeviceDialog(defaultPort: cfg.port,
+      onAdd: (d) { ref.read(deviceListProvider.notifier).addDevice(d); ScaffoldMessenger.of(ctx).showSnackBar(SnackBar(content: Text(l10n.deviceAdded(d.name)), behavior: SnackBarBehavior.floating)); },
+      l10n: l10n,
+    ));
   }
 
-  /// 构建高斯模糊背景
-  Widget _buildBlurredBackground(BuildContext context) {
-    final colorScheme = Theme.of(context).colorScheme;
-    return ClipRect(
-      child: BackdropFilter(
-        filter: ImageFilter.blur(sigmaX: 20, sigmaY: 20),
-        child: Container(
-          decoration: BoxDecoration(
-            gradient: LinearGradient(
-              begin: Alignment.topCenter,
-              end: Alignment.bottomCenter,
-              colors: [
-                colorScheme.primary.withValues(alpha: 0.1),
-                colorScheme.surface,
-              ],
-            ),
-          ),
-        ),
-      ),
-    );
+  void _showDiscover(BuildContext ctx, WidgetRef ref, AppLocalizations l10n) {
+    final di = ref.read(discoveryIntegrationProvider);
+    final existing = ref.read(deviceListProvider);
+    showDialog(context: ctx, builder: (c) => _DiscoveredDevicesDialog(discoveryIntegration: di, existingDevices: existing,
+      onAdd: (d) { ref.read(deviceListProvider.notifier).addDevice(d); ScaffoldMessenger.of(ctx).showSnackBar(SnackBar(content: Text(l10n.deviceAdded(d.name)), behavior: SnackBarBehavior.floating)); },
+      l10n: l10n,
+    ));
   }
 
-  /// 构建设备列表主体
-  Widget _buildDeviceList(BuildContext context, WidgetRef ref,
-      List<ManagedDevice> devices, AppLocalizations l10n) {
-    if (devices.isEmpty) {
-      return _buildEmptyState(context, l10n);
-    }
-
-    final onlineCount = devices.where((d) => d.isOnline).length;
-    final sortState = ref.watch(sortStateProvider);
-
-    return RefreshIndicator(
-      onRefresh: () async {
-        await Future<void>.delayed(const Duration(seconds: 1));
-      },
-      child: CustomScrollView(
-        slivers: [
-          // 顶部统计信息和当前排序
-          SliverToBoxAdapter(
-            child: Padding(
-              padding: const EdgeInsets.fromLTRB(20, 16, 20, 8),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    children: [
-                      Icon(
-                        Icons.device_hub,
-                        size: 18,
-                        color: Theme.of(context).colorScheme.onSurfaceVariant,
-                      ),
-                      const SizedBox(width: 8),
-                      Text(
-                        l10n.deviceCount(devices.length, onlineCount),
-                        style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                              color:
-                                  Theme.of(context).colorScheme.onSurfaceVariant,
-                            ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 4),
-                  // 当前排序方式
-                  Text(
-                    '${l10n.currentSort}: ${_getSortTypeName(sortState.type, l10n)} ${sortState.direction == SortDirection.ascending ? '↑' : '↓'}',
-                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                          color:
-                              Theme.of(context).colorScheme.onSurfaceVariant.withValues(alpha: 0.7),
-                        ),
-                  ),
-                ],
-              ),
-            ),
-          ),
-
-          // 设备卡片列表
-          SliverList(
-            delegate: SliverChildBuilderDelegate(
-              (context, index) {
-                final device = devices[index];
-                return DeviceCard(
-                  device: device,
-                  onTap: () => _navigateToDetail(context, device, l10n),
-                );
-              },
-              childCount: devices.length,
-            ),
-          ),
-
-          const SliverToBoxAdapter(
-            child: SizedBox(height: 24),
-          ),
-        ],
-      ),
-    );
+  Widget _blurBg(BuildContext ctx) {
+    final cs = Theme.of(ctx).colorScheme;
+    return ClipRect(child: BackdropFilter(filter: ImageFilter.blur(sigmaX: 20, sigmaY: 20), child: Container(decoration: BoxDecoration(gradient: LinearGradient(begin: Alignment.topCenter, end: Alignment.bottomCenter, colors: [cs.primary.withValues(alpha: 0.1), cs.surface])))));
   }
 
-  /// 获取排序方式名称
-  String _getSortTypeName(SortType type, AppLocalizations l10n) {
-    switch (type) {
-      case SortType.time:
-        return l10n.sortByTime;
-      case SortType.name:
-        return l10n.sortByName;
-      case SortType.status:
-        return l10n.sortByStatus;
-      case SortType.ip:
-        return l10n.sortByIp;
-    }
+  Widget _deviceList(BuildContext ctx, WidgetRef ref, List<ManagedDevice> devices, AppLocalizations l10n) {
+    if (devices.isEmpty) return _empty(ctx, l10n);
+    final online = devices.where((d) => d.isOnline).length;
+    final s = ref.watch(sortStateProvider);
+    return RefreshIndicator(onRefresh: () async { await Future<void>.delayed(const Duration(seconds: 1)); }, child: CustomScrollView(slivers: [
+      SliverToBoxAdapter(child: Padding(padding: const EdgeInsets.fromLTRB(20, 16, 20, 8), child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        Row(children: [Icon(Icons.device_hub, size: 18, color: Theme.of(ctx).colorScheme.onSurfaceVariant), const SizedBox(width: 8), Text(l10n.deviceCount(devices.length, online), style: Theme.of(ctx).textTheme.bodyMedium?.copyWith(color: Theme.of(ctx).colorScheme.onSurfaceVariant))]),
+        const SizedBox(height: 4),
+        Text('${l10n.currentSort}: ${_name(s.type, l10n)} ${s.direction == SortDirection.ascending ? '↑' : '↓'}', style: Theme.of(ctx).textTheme.bodySmall?.copyWith(color: Theme.of(ctx).colorScheme.onSurfaceVariant.withValues(alpha: 0.7))),
+      ]))),
+      SliverList(delegate: SliverChildBuilderDelegate((_, i) => DeviceCard(device: devices[i], onTap: () => _toDetail(ctx, devices[i])), childCount: devices.length)),
+      const SliverToBoxAdapter(child: SizedBox(height: 24)),
+    ]));
   }
 
-  /// 空状态视图
-  Widget _buildEmptyState(BuildContext context, AppLocalizations l10n) {
-    final colorScheme = Theme.of(context).colorScheme;
-
-    return Center(
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Icon(
-            Icons.devices_other,
-            size: 64,
-            color: colorScheme.onSurfaceVariant.withValues(alpha: 0.4),
-          ),
-          const SizedBox(height: 16),
-          Text(
-            l10n.noDeviceFound,
-            style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                  color: colorScheme.onSurfaceVariant,
-                ),
-          ),
-          const SizedBox(height: 8),
-          Text(
-            l10n.ensureSameNetwork,
-            style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                  color: colorScheme.onSurfaceVariant.withValues(alpha: 0.7),
-                ),
-          ),
-        ],
-      ),
-    );
+  Widget _empty(BuildContext ctx, AppLocalizations l10n) {
+    final cs = Theme.of(ctx).colorScheme;
+    return Center(child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
+      Icon(Icons.devices_other, size: 64, color: cs.onSurfaceVariant.withValues(alpha: 0.4)), const SizedBox(height: 16),
+      Text(l10n.noDeviceFound, style: Theme.of(ctx).textTheme.titleMedium?.copyWith(color: cs.onSurfaceVariant)),
+      const SizedBox(height: 8), Text(l10n.ensureSameNetwork, style: Theme.of(ctx).textTheme.bodySmall?.copyWith(color: cs.onSurfaceVariant.withValues(alpha: 0.7))),
+    ]));
   }
 
-  /// 导航到设备详情页
-  void _navigateToDetail(
-      BuildContext context, ManagedDevice device, AppLocalizations l10n) {
-    Navigator.of(context).push(
-      MaterialPageRoute(
-        builder: (_) => DeviceDetailPage(
-          deviceName: device.name,
-          deviceIp: device.ipAddress,
-        ),
-      ),
-    );
+  void _toDetail(BuildContext ctx, ManagedDevice device) {
+    Navigator.of(ctx).push(MaterialPageRoute(builder: (_) => DeviceDetailPage(device: device)));
   }
 }
 
-/// 添加设备对话框
+/// 添加设备对话框（含令牌和连通性验证）
 class _AddDeviceDialog extends StatefulWidget {
-  final Function(String name, String ip, int port) onAdd;
-  final AppLocalizations l10n;
-
-  const _AddDeviceDialog({required this.onAdd, required this.l10n});
-
-  @override
-  State<_AddDeviceDialog> createState() => _AddDeviceDialogState();
+  final Function(ManagedDevice) onAdd; final AppLocalizations l10n; final int defaultPort;
+  const _AddDeviceDialog({required this.onAdd, required this.l10n, required this.defaultPort});
+  @override State<_AddDeviceDialog> createState() => _AddDeviceDialogState();
 }
 
 class _AddDeviceDialogState extends State<_AddDeviceDialog> {
-  final _formKey = GlobalKey<FormState>();
-  final _nameController = TextEditingController();
-  final _ipController = TextEditingController();
-  final _portController = TextEditingController(text: '19190');
+  final _fk = GlobalKey<FormState>();
+  final _n = TextEditingController(), _ip = TextEditingController(), _port = TextEditingController(), _tok = TextEditingController();
+  bool _vfy = false; String? _vr;
 
-  @override
-  void dispose() {
-    _nameController.dispose();
-    _ipController.dispose();
-    _portController.dispose();
-    super.dispose();
+  @override void initState() { super.initState(); _port.text = widget.defaultPort.toString(); }
+  @override void dispose() { _n.dispose(); _ip.dispose(); _port.dispose(); _tok.dispose(); super.dispose(); }
+
+  Future<void> _verify() async {
+    if (!_fk.currentState!.validate()) return;
+    setState(() { _vfy = true; _vr = null; });
+    try {
+      final ip = _ip.text; final port = int.parse(_port.text); final tok = _tok.text;
+      final client = HttpClient(); client.connectionTimeout = const Duration(seconds: 5);
+      final req = await client.getUrl(Uri.parse('http://$ip:$port/health'));
+      final resp = await req.close().timeout(const Duration(seconds: 5));
+      if (resp.statusCode == 200) {
+        if (tok.isNotEmpty) {
+          final r2 = await client.getUrl(Uri.parse('http://$ip:$port/_/$tok'));
+          final resp2 = await r2.close().timeout(const Duration(seconds: 5));
+          setState(() { _vr = resp2.statusCode == 200 ? '✅ 设备在线，令牌有效' : resp2.statusCode == 403 ? '⚠️ 设备在线但令牌无效' : '✅ 设备在线（状态码 ${resp2.statusCode}）'; _vfy = false; });
+        } else { setState(() { _vr = '⚠️ 设备在线但未填写令牌（将无法获取数据）'; _vfy = false; }); }
+      } else { setState(() { _vr = '❌ 设备无响应（${resp.statusCode}）'; _vfy = false; }); }
+      client.close();
+    } catch (e) { setState(() { _vr = '❌ 无法连接: $e'; _vfy = false; }); }
   }
 
   @override
-  Widget build(BuildContext context) {
-    return AlertDialog(
-      title: Text(widget.l10n.addDevice),
-      content: Form(
-        key: _formKey,
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            TextFormField(
-              controller: _nameController,
-              decoration: InputDecoration(
-                labelText: widget.l10n.deviceName,
-                hintText: widget.l10n.deviceNameHint,
-                prefixIcon: const Icon(Icons.devices),
-              ),
-              validator: (value) {
-                if (value == null || value.isEmpty) {
-                  return widget.l10n.enterDeviceName;
-                }
-                return null;
-              },
-            ),
-            const SizedBox(height: 16),
-            TextFormField(
-              controller: _ipController,
-              decoration: InputDecoration(
-                labelText: widget.l10n.ipAddress,
-                hintText: widget.l10n.ipAddressHint,
-                prefixIcon: const Icon(Icons.language),
-              ),
-              keyboardType: TextInputType.url,
-              validator: (value) {
-                if (value == null || value.isEmpty) {
-                  return widget.l10n.enterIpAddress;
-                }
-                final ipRegex =
-                    RegExp(r'^\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}$');
-                if (!ipRegex.hasMatch(value)) {
-                  return widget.l10n.invalidIpAddress;
-                }
-                return null;
-              },
-            ),
-            const SizedBox(height: 16),
-            TextFormField(
-              controller: _portController,
-              decoration: InputDecoration(
-                labelText: widget.l10n.port,
-                hintText: widget.l10n.portHint,
-                prefixIcon: const Icon(Icons.numbers),
-              ),
-              keyboardType: TextInputType.number,
-              validator: (value) {
-                if (value == null || value.isEmpty) {
-                  return widget.l10n.enterPort;
-                }
-                final port = int.tryParse(value);
-                if (port == null || port < 1 || port > 65535) {
-                  return widget.l10n.invalidPort;
-                }
-                return null;
-              },
-            ),
-          ],
-        ),
-      ),
-      actions: [
-        TextButton(
-          onPressed: () => Navigator.pop(context),
-          child: Text(widget.l10n.cancel),
-        ),
-        FilledButton(
-          onPressed: () {
-            if (_formKey.currentState!.validate()) {
-              widget.onAdd(
-                _nameController.text,
-                _ipController.text,
-                int.parse(_portController.text),
-              );
-              Navigator.pop(context);
-            }
-          },
-          child: Text(widget.l10n.add),
-        ),
-      ],
-    );
-  }
+  Widget build(BuildContext ctx) => AlertDialog(
+    title: Text(widget.l10n.addDevice),
+    content: Form(key: _fk, child: SingleChildScrollView(child: Column(mainAxisSize: MainAxisSize.min, children: [
+      TextFormField(controller: _n, decoration: InputDecoration(labelText: widget.l10n.deviceName, hintText: widget.l10n.deviceNameHint, prefixIcon: const Icon(Icons.devices)), validator: (v) => (v == null || v.isEmpty) ? widget.l10n.enterDeviceName : null),
+      const SizedBox(height: 12),
+      TextFormField(controller: _ip, decoration: InputDecoration(labelText: widget.l10n.ipAddress, hintText: widget.l10n.ipAddressHint, prefixIcon: const Icon(Icons.language)), keyboardType: TextInputType.url, validator: (v) { if (v == null || v.isEmpty) return widget.l10n.enterIpAddress; if (!RegExp(r'^\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}$').hasMatch(v)) return widget.l10n.invalidIpAddress; return null; }),
+      const SizedBox(height: 12),
+      TextFormField(controller: _port, decoration: InputDecoration(labelText: widget.l10n.port, hintText: widget.l10n.portHint, prefixIcon: const Icon(Icons.numbers)), keyboardType: TextInputType.number, validator: (v) { if (v == null || v.isEmpty) return widget.l10n.enterPort; final p = int.tryParse(v); if (p == null || p < 1 || p > 65535) return widget.l10n.invalidPort; return null; }),
+      const SizedBox(height: 12),
+      TextFormField(controller: _tok, decoration: InputDecoration(labelText: widget.l10n.accessTokenLabel, hintText: widget.l10n.accessTokenHint, prefixIcon: const Icon(Icons.key))),
+      if (_vr != null) ...[const SizedBox(height: 12), Container(padding: const EdgeInsets.all(8), decoration: BoxDecoration(color: Theme.of(ctx).colorScheme.surfaceContainerHighest, borderRadius: BorderRadius.circular(8)), child: Text(_vr!, style: const TextStyle(fontSize: 13)))],
+      const SizedBox(height: 8),
+      SizedBox(width: double.infinity, child: OutlinedButton.icon(onPressed: _vfy ? null : _verify, icon: _vfy ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2)) : const Icon(Icons.wifi_find), label: Text(_vfy ? widget.l10n.verifying : widget.l10n.verifyConnection))),
+    ]))),
+    actions: [
+      TextButton(onPressed: () => Navigator.pop(ctx), child: Text(widget.l10n.cancel)),
+      FilledButton(onPressed: () {
+        if (_fk.currentState!.validate()) {
+          widget.onAdd(ManagedDevice(deviceId: DateTime.now().millisecondsSinceEpoch.toString(), name: _n.text, ipAddress: _ip.text, port: int.parse(_port.text), accessToken: _tok.text, onlineStatus: DeviceOnlineStatus.unknown, discoveredAt: DateTime.now()));
+          Navigator.pop(ctx);
+        }
+      }, child: Text(widget.l10n.add)),
+    ],
+  );
 }
 
 /// 已发现设备对话框
 class _DiscoveredDevicesDialog extends StatefulWidget {
-  final DiscoveryIntegration discoveryIntegration;
-  final List<ManagedDevice> existingDevices;
-  final Function(ManagedDevice) onAdd;
-  final AppLocalizations l10n;
-
-  const _DiscoveredDevicesDialog({
-    required this.discoveryIntegration,
-    required this.existingDevices,
-    required this.onAdd,
-    required this.l10n,
-  });
-
-  @override
-  State<_DiscoveredDevicesDialog> createState() =>
-      _DiscoveredDevicesDialogState();
+  final DiscoveryIntegration discoveryIntegration; final List<ManagedDevice> existingDevices; final Function(ManagedDevice) onAdd; final AppLocalizations l10n;
+  const _DiscoveredDevicesDialog({required this.discoveryIntegration, required this.existingDevices, required this.onAdd, required this.l10n});
+  @override State<_DiscoveredDevicesDialog> createState() => _DiscoveredDevicesDialogState();
 }
 
 class _DiscoveredDevicesDialogState extends State<_DiscoveredDevicesDialog> {
-  final List<DiscoveryMessage> _discoveredDevices = [];
-  bool _isScanning = false;
-  StreamSubscription? _discoverySubscription;
+  final List<DiscoveryMessage> _list = []; bool _scanning = false; StreamSubscription? _sub;
+  @override void initState() { super.initState(); _start(); }
+  @override void dispose() { _sub?.cancel(); super.dispose(); }
+  void _start() { setState(() { _scanning = true; _list.clear(); }); _sub?.cancel(); _sub = widget.discoveryIntegration.onDeviceDiscovered.listen((m) { if (mounted && !_list.any((d) => d.deviceId == m.deviceId)) setState(() => _list.add(m)); }); Future.delayed(const Duration(seconds: 10), () { if (mounted) setState(() => _scanning = false); }); }
+  bool _added(String id) => widget.existingDevices.any((d) => d.deviceId == id);
 
   @override
-  void initState() {
-    super.initState();
-    _startScanning();
-  }
-
-  @override
-  void dispose() {
-    _discoverySubscription?.cancel();
-    super.dispose();
-  }
-
-  void _startScanning() {
-    setState(() {
-      _isScanning = true;
-      _discoveredDevices.clear();
-    });
-
-    // 取消之前的订阅，避免重复监听
-    _discoverySubscription?.cancel();
-
-    // 监听设备发现事件
-    _discoverySubscription =
-        widget.discoveryIntegration.onDeviceDiscovered.listen((message) {
-      if (mounted) {
-        setState(() {
-          // 避免重复添加
-          if (!_discoveredDevices
-              .any((d) => d.deviceId == message.deviceId)) {
-            _discoveredDevices.add(message);
-          }
-        });
-      }
-    });
-
-    // 10 秒后停止扫描
-    Future.delayed(const Duration(seconds: 10), () {
-      if (mounted) {
-        setState(() {
-          _isScanning = false;
-        });
-      }
-    });
-  }
-
-  bool _isDeviceAdded(String deviceId) {
-    return widget.existingDevices.any((d) => d.deviceId == deviceId);
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return AlertDialog(
-      title: Row(
-        children: [
-          Text(widget.l10n.discoverDevice),
-          if (_isScanning) ...[
-            const SizedBox(width: 8),
-            const SizedBox(
-              width: 16,
-              height: 16,
-              child: CircularProgressIndicator(strokeWidth: 2),
-            ),
-          ],
-        ],
-      ),
-      content: SizedBox(
-        width: double.maxFinite,
-        height: 300,
-        child: _discoveredDevices.isEmpty
-            ? Center(
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Icon(
-                      Icons.search,
-                      size: 48,
-                      color: Theme.of(context)
-                          .colorScheme
-                          .onSurfaceVariant
-                          .withValues(alpha: 0.4),
-                    ),
-                    const SizedBox(height: 16),
-                    Text(
-                      _isScanning
-                          ? widget.l10n.scanning
-                          : widget.l10n.noDevicesFound,
-                      style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-                            color: Theme.of(context)
-                                .colorScheme
-                                .onSurfaceVariant,
-                          ),
-                    ),
-                    if (!_isScanning) ...[
-                      const SizedBox(height: 8),
-                      TextButton(
-                        onPressed: _startScanning,
-                        child: Text(widget.l10n.scanAgain),
-                      ),
-                    ],
-                  ],
-                ),
-              )
-            : ListView.builder(
-                itemCount: _discoveredDevices.length,
-                itemBuilder: (context, index) {
-                  final device = _discoveredDevices[index];
-                  final isAdded = _isDeviceAdded(device.deviceId);
-
-                  return ListTile(
-                    leading: Icon(
-                      Icons.devices,
-                      color: Theme.of(context).colorScheme.primary,
-                    ),
-                    title: Text(device.deviceName),
-                    subtitle: Text('${device.ip}:${device.port}'),
-                    trailing: isAdded
-                        ? Chip(
-                            label: Text(widget.l10n.added),
-                            backgroundColor: Theme.of(context)
-                                .colorScheme
-                                .surfaceContainerHighest,
-                          )
-                        : FilledButton(
-                            onPressed: () {
-                              final newDevice = ManagedDevice(
-                                deviceId: device.deviceId,
-                                name: device.deviceName,
-                                ipAddress: device.ip,
-                                port: device.port,
-                                onlineStatus: DeviceOnlineStatus.online,
-                                discoveredAt: DateTime.now(),
-                                lastSeenAt: DateTime.now(),
-                              );
-                              widget.onAdd(newDevice);
-                              Navigator.pop(context);
-                            },
-                            child: Text(widget.l10n.add),
-                          ),
-                  );
-                },
-              ),
-      ),
-      actions: [
-        TextButton(
-          onPressed: () => Navigator.pop(context),
-          child: Text(widget.l10n.close),
-        ),
-      ],
-    );
-  }
+  Widget build(BuildContext ctx) => AlertDialog(
+    title: Row(children: [Text(widget.l10n.discoverDevice), if (_scanning) ...[const SizedBox(width: 8), const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2))]]),
+    content: SizedBox(width: double.maxFinite, height: 300, child: _list.isEmpty ? Center(child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
+      Icon(Icons.search, size: 48, color: Theme.of(ctx).colorScheme.onSurfaceVariant.withValues(alpha: 0.4)), const SizedBox(height: 16),
+      Text(_scanning ? widget.l10n.scanning : widget.l10n.noDevicesFound, style: Theme.of(ctx).textTheme.bodyLarge?.copyWith(color: Theme.of(ctx).colorScheme.onSurfaceVariant)),
+      if (!_scanning) ...[const SizedBox(height: 8), TextButton(onPressed: _start, child: Text(widget.l10n.scanAgain))],
+    ])) : ListView.builder(itemCount: _list.length, itemBuilder: (_, i) {
+      final d = _list[i]; final added = _added(d.deviceId);
+      return ListTile(leading: Icon(Icons.devices, color: Theme.of(ctx).colorScheme.primary), title: Text(d.deviceName), subtitle: Text('${d.ip}:${d.port}'),
+        trailing: added ? Chip(label: Text(widget.l10n.added), backgroundColor: Theme.of(ctx).colorScheme.surfaceContainerHighest) : FilledButton(onPressed: () {
+          widget.onAdd(ManagedDevice(deviceId: d.deviceId, name: d.deviceName, ipAddress: d.ip, port: d.port, accessToken: d.accessToken, onlineStatus: DeviceOnlineStatus.online, discoveredAt: DateTime.now(), lastSeenAt: DateTime.now()));
+          Navigator.pop(ctx);
+        }, child: Text(widget.l10n.add)));
+    })),
+    actions: [TextButton(onPressed: () => Navigator.pop(ctx), child: Text(widget.l10n.close))],
+  );
 }

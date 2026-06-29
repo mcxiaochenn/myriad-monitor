@@ -128,11 +128,13 @@ jobs:
           flutter build apk --release
           --dart-define=APP_VERSION=${{ env.APP_VERSION }}
           --dart-define=APP_BUILD_NUMBER=${{ env.APP_BUILD_NUMBER }}
+          --build-number=${{ env.APP_BUILD_NUMBER }}
 
       - run: >-
           flutter build apk --debug
           --dart-define=APP_VERSION=${{ env.APP_VERSION }}
           --dart-define=APP_BUILD_NUMBER=${{ env.APP_BUILD_NUMBER }}
+          --build-number=${{ env.APP_BUILD_NUMBER }}
 
       - name: Rename APKs
         run: |

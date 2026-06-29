@@ -2,435 +2,169 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:qr_flutter/qr_flutter.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:uuid/uuid.dart';
 import '../../core/access_token.dart';
+import '../../server/server_service.dart';
 import '../../l10n/app_localizations.dart';
 import '../settings/settings_page.dart';
 
-/// 服务运行状态 Provider
-final serverStatusProvider =
-    StateNotifierProvider<ServerStatusNotifier, ServerStatus>((ref) {
-  return ServerStatusNotifier();
-});
+// ── 日志 ──
+final serverLogProvider = StateProvider<List<String>>((ref) => []);
 
-/// 服务状态
+void addServerLog(WidgetRef ref, String msg) {
+  final now = DateTime.now();
+  final ts = '${now.hour.toString().padLeft(2, '0')}:${now.minute.toString().padLeft(2, '0')}:${now.second.toString().padLeft(2, '0')}';
+  ref.read(serverLogProvider.notifier).state = ['[$ts] $msg', ...ref.read(serverLogProvider)].take(200).toList();
+}
+
+// ── 服务状态 ──
 class ServerStatus {
-  final bool isRunning;
-  final int connectedClients;
-
-  ServerStatus({
-    this.isRunning = false,
-    this.connectedClients = 0,
-  });
-
-  ServerStatus copyWith({
-    bool? isRunning,
-    int? connectedClients,
-  }) {
-    return ServerStatus(
-      isRunning: isRunning ?? this.isRunning,
-      connectedClients: connectedClients ?? this.connectedClients,
-    );
-  }
+  final bool isRunning; final int connectedClients;
+  ServerStatus({this.isRunning = false, this.connectedClients = 0});
+  ServerStatus copyWith({bool? isRunning, int? connectedClients}) =>
+      ServerStatus(isRunning: isRunning ?? this.isRunning, connectedClients: connectedClients ?? this.connectedClients);
 }
 
-/// 服务状态管理
+final serverStatusProvider = StateNotifierProvider<ServerStatusNotifier, ServerStatus>((ref) => ServerStatusNotifier());
+
 class ServerStatusNotifier extends StateNotifier<ServerStatus> {
+  ServerService? _service;
   ServerStatusNotifier() : super(ServerStatus());
+  ServerService? get service => _service;
 
-  void toggleService() {
-    state = state.copyWith(isRunning: !state.isRunning);
-    // TODO: 实际启动/停止 HTTP 服务
+  Future<void> toggleService(WidgetRef ref) async {
+    if (state.isRunning) {
+      await _service?.stop(); _service = null;
+      state = state.copyWith(isRunning: false);
+      addServerLog(ref, 'HTTP 服务已停止');
+    } else {
+      final cfg = ref.read(serverConfigProvider);
+      _service = ServerService(port: cfg.port, address: cfg.address);
+      final did = ref.read(deviceIdProvider).value ?? const Uuid().v4();
+      final ok = await _service!.start(deviceId: did, deviceName: cfg.deviceName);
+      state = state.copyWith(isRunning: ok);
+      addServerLog(ref, ok ? 'HTTP 服务已启动 → 0.0.0.0:${cfg.port}' : 'HTTP 服务启动失败');
+    }
   }
 
-  void updateClientCount(int count) {
-    state = state.copyWith(connectedClients: count);
-  }
+  @override void dispose() { _service?.dispose(); super.dispose(); }
 }
 
-/// 设备 ID Provider
 final deviceIdProvider = FutureProvider<String>((ref) async {
   final prefs = await SharedPreferences.getInstance();
-  String? deviceId = prefs.getString('device_id');
-
-  if (deviceId == null || deviceId.isEmpty) {
-    deviceId = const Uuid().v4();
-    await prefs.setString('device_id', deviceId);
-  }
-
-  return deviceId;
+  String? id = prefs.getString('device_id');
+  if (id == null || id.isEmpty) { id = const Uuid().v4(); await prefs.setString('device_id', id); }
+  return id;
 });
 
-/// 服务端页面
-///
-/// 显示当前设备信息和 HTTP 服务运行状态
 class ServerPage extends ConsumerWidget {
   const ServerPage({super.key});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final l10n = AppLocalizations.of(context);
-    final config = ref.watch(serverConfigProvider);
-    final serverStatus = ref.watch(serverStatusProvider);
-    final deviceIdAsync = ref.watch(deviceIdProvider);
+    final l = AppLocalizations.of(context);
+    final cfg = ref.watch(serverConfigProvider);
+    final s = ref.watch(serverStatusProvider);
+    final did = ref.watch(deviceIdProvider);
+    final logs = ref.watch(serverLogProvider);
+    final theme = Theme.of(context);
 
     return Scaffold(
-      appBar: AppBar(
-        title: Text(l10n.navServer),
-        centerTitle: true,
-      ),
-      body: ListView(
-        children: [
-          // 设备信息卡片
-          _buildDeviceInfoCard(context, l10n, config, deviceIdAsync),
-
-          const SizedBox(height: 16),
-
-          // 服务状态卡片
-          _buildServiceStatusCard(context, ref, l10n, config, serverStatus),
-
-          const SizedBox(height: 16),
-
-          // 网络信息卡片
-          _buildNetworkInfoCard(context, l10n),
-
-          const SizedBox(height: 16),
-
-          // 连接的客户端卡片
-          _buildConnectedClientsCard(context, l10n, serverStatus),
-        ],
-      ),
+      appBar: AppBar(title: Text(l.navServer), centerTitle: true),
+      body: ListView(children: [
+        _infoCard(theme, l, cfg, did), const SizedBox(height: 16),
+        _svcCard(context, ref, theme, l, cfg, s, did), const SizedBox(height: 16),
+        _bindCard(context, ref, theme, cfg, s, did), const SizedBox(height: 16),
+        _logCard(theme, logs, ref), const SizedBox(height: 16),
+        _netCard(context, theme, l),
+      ]),
     );
   }
 
-  /// 构建设备信息卡片
-  Widget _buildDeviceInfoCard(
-    BuildContext context,
-    AppLocalizations l10n,
-    ServerConfig config,
-    AsyncValue<String> deviceIdAsync,
-  ) {
-    return Card(
-      margin: const EdgeInsets.all(16),
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                Icon(
-                  Icons.phone_android,
-                  color: Theme.of(context).colorScheme.primary,
-                ),
-                const SizedBox(width: 8),
-                Text(
-                  l10n.deviceInfo,
-                  style: Theme.of(context).textTheme.titleMedium,
-                ),
-              ],
-            ),
-            const Divider(),
-            _buildInfoRow(l10n.deviceNameLabel, config.deviceName),
-            _buildInfoRow(
-              l10n.deviceId,
-              deviceIdAsync.when(
-                data: (id) => id.substring(0, 8), // 只显示前 8 位
-                loading: () => '...',
-                error: (_, __) => 'error',
-              ),
-            ),
-            _buildInfoRow(l10n.os, _getOsName(l10n)),
-            _buildInfoRow(l10n.hostname, _getHostname()),
-          ],
+  Widget _infoCard(ThemeData t, AppLocalizations l, ServerConfig c, AsyncValue<String> d) => Card(margin: const EdgeInsets.all(16), child: Padding(padding: const EdgeInsets.all(16), child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+    Row(children: [Icon(Icons.phone_android, color: t.colorScheme.primary), const SizedBox(width: 8), Text(l.deviceInfo, style: t.textTheme.titleMedium)]), const Divider(),
+    _row(l.deviceNameLabel, c.deviceName), _row(l.deviceId, d.when(data: (v) => v.substring(0, 8), loading: () => '...', error: (_, __) => 'error')),
+    _row(l.os, _os), _row(l.hostname, _host),
+  ])));
+
+  Widget _svcCard(BuildContext ctx, WidgetRef ref, ThemeData t, AppLocalizations l, ServerConfig c, ServerStatus s, AsyncValue<String> d) {
+    final tok = ref.watch(accessTokenProvider);
+    return Card(margin: const EdgeInsets.symmetric(horizontal: 16), child: Padding(padding: const EdgeInsets.all(16), child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+      Row(children: [Icon(Icons.cloud, color: t.colorScheme.primary), const SizedBox(width: 8), Text(l.serviceStatus, style: t.textTheme.titleMedium)]), const Divider(),
+      _statusRow(l.httpService, s.isRunning, s.isRunning ? l.running : l.stopped), _row(l.serverPort, '${c.port}'), _row(l.listenAddress, c.address), _row(l.pushInterval, l.seconds(c.pushInterval)), const Divider(),
+      d.when(
+        data: (did) => tok.when(
+          data: (tk) => Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            _row(l.accessUrl, 'http://{ip}:${c.port}/$did/$tk'), const SizedBox(height: 8),
+            Row(children: [Expanded(child: _row(l.accessTokenLabel, tk.length > 16 ? '${tk.substring(0, 8)}...${tk.substring(tk.length - 8)}' : tk)), IconButton(icon: const Icon(Icons.copy, size: 18), tooltip: l.copyToken, onPressed: () { Clipboard.setData(ClipboardData(text: tk)); ScaffoldMessenger.of(ctx).showSnackBar(SnackBar(content: Text(l.tokenCopied), behavior: SnackBarBehavior.floating)); })]),
+          ]),
+          loading: () => _row(l.accessTokenLabel, '...'),
+          error: (_, __) => _row(l.accessTokenLabel, 'Error'),
         ),
+        loading: () => _row(l.accessUrl, '...'),
+        error: (_, __) => _row(l.accessUrl, 'Error'),
       ),
-    );
+      const SizedBox(height: 16),
+      SizedBox(width: double.infinity, child: FilledButton.icon(
+        onPressed: () => ref.read(serverStatusProvider.notifier).toggleService(ref),
+        icon: Icon(s.isRunning ? Icons.stop : Icons.play_arrow), label: Text(s.isRunning ? l.stopService : l.startService))),
+    ])));
   }
 
-  /// 构建服务状态卡片
-  Widget _buildServiceStatusCard(
-    BuildContext context,
-    WidgetRef ref,
-    AppLocalizations l10n,
-    ServerConfig config,
-    ServerStatus status,
-  ) {
-    final deviceIdAsync = ref.watch(deviceIdProvider);
-    final tokenAsync = ref.watch(accessTokenProvider);
-
-    return Card(
-      margin: const EdgeInsets.symmetric(horizontal: 16),
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                Icon(
-                  Icons.cloud,
-                  color: Theme.of(context).colorScheme.primary,
-                ),
-                const SizedBox(width: 8),
-                Text(
-                  l10n.serviceStatus,
-                  style: Theme.of(context).textTheme.titleMedium,
-                ),
-              ],
-            ),
-            const Divider(),
-            _buildStatusRow(
-              l10n.httpService,
-              status.isRunning,
-              status.isRunning ? l10n.running : l10n.stopped,
-            ),
-            _buildInfoRow(l10n.serverPort, '${config.port}'),
-            _buildInfoRow(l10n.listenAddress, config.address),
-            _buildInfoRow(l10n.pushInterval, l10n.seconds(config.pushInterval)),
-            const Divider(),
-            // HTTP API 访问地址
-            deviceIdAsync.when(
-              data: (deviceId) => tokenAsync.when(
-                data: (token) {
-                  final url = 'http://{ip}:${config.port}/$deviceId/$token';
-                  return Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      _buildInfoRow(l10n.accessUrl, url),
-                      const SizedBox(height: 8),
-                      Row(
-                        children: [
-                          Expanded(
-                            child: _buildInfoRow(
-                              l10n.accessTokenLabel,
-                              token.length > 16
-                                  ? '${token.substring(0, 8)}...${token.substring(token.length - 8)}'
-                                  : token,
-                            ),
-                          ),
-                          IconButton(
-                            icon: const Icon(Icons.copy, size: 18),
-                            tooltip: l10n.copyToken,
-                            onPressed: () {
-                              Clipboard.setData(ClipboardData(text: token));
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                SnackBar(
-                                  content: Text(l10n.tokenCopied),
-                                  behavior: SnackBarBehavior.floating,
-                                ),
-                              );
-                            },
-                          ),
-                        ],
-                      ),
-                    ],
-                  );
-                },
-                loading: () => _buildInfoRow(l10n.accessTokenLabel, '...'),
-                error: (_, __) => _buildInfoRow(l10n.accessTokenLabel, 'Error'),
-              ),
-              loading: () => _buildInfoRow(l10n.accessUrl, '...'),
-              error: (_, __) => _buildInfoRow(l10n.accessUrl, 'Error'),
-            ),
-            const SizedBox(height: 16),
-            SizedBox(
-              width: double.infinity,
-              child: FilledButton.icon(
-                onPressed: () {
-                  ref.read(serverStatusProvider.notifier).toggleService();
-                },
-                icon: Icon(status.isRunning ? Icons.stop : Icons.play_arrow),
-                label: Text(
-                    status.isRunning ? l10n.stopService : l10n.startService),
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
+  Widget _bindCard(BuildContext ctx, WidgetRef ref, ThemeData t, ServerConfig c, ServerStatus s, AsyncValue<String> d) {
+    final tok = ref.watch(accessTokenProvider);
+    return Card(margin: const EdgeInsets.symmetric(horizontal: 16), child: Padding(padding: const EdgeInsets.all(16), child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+      Row(children: [Icon(Icons.qr_code, color: t.colorScheme.primary), const SizedBox(width: 8), Text('绑定设备', style: t.textTheme.titleMedium)]), const Divider(),
+      Text('生成二维码供其他设备扫描绑定', style: t.textTheme.bodySmall?.copyWith(color: t.colorScheme.onSurfaceVariant)), const SizedBox(height: 12),
+      SizedBox(width: double.infinity, child: OutlinedButton.icon(
+        onPressed: !s.isRunning ? null : () {
+          d.whenData((did) => tok.whenData((tk) => _showQr(ctx, c, did, tk)));
+        },
+        icon: const Icon(Icons.qr_code), label: Text(s.isRunning ? '显示绑定二维码' : '请先启动服务'),
+      )),
+    ])));
   }
 
-  /// 构建网络信息卡片
-  Widget _buildNetworkInfoCard(BuildContext context, AppLocalizations l10n) {
-    return Card(
-      margin: const EdgeInsets.symmetric(horizontal: 16),
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                Icon(
-                  Icons.wifi,
-                  color: Theme.of(context).colorScheme.primary,
-                ),
-                const SizedBox(width: 8),
-                Text(
-                  l10n.networkInfo,
-                  style: Theme.of(context).textTheme.titleMedium,
-                ),
-              ],
-            ),
-            const Divider(),
-            FutureBuilder<List<String>>(
-              future: _getLocalIps(),
-              builder: (context, snapshot) {
-                if (snapshot.hasData) {
-                  return Column(
-                    children: snapshot.data!
-                        .map((ip) => _buildInfoRow(l10n.ipAddress, ip))
-                        .toList(),
-                  );
-                }
-                return _buildInfoRow(l10n.ipAddress, l10n.detecting);
-              },
-            ),
-          ],
-        ),
-      ),
-    );
+  void _showQr(BuildContext ctx, ServerConfig c, String did, String tk) async {
+    final ips = await _getIps();
+    final ip = ips.isNotEmpty ? ips.first : '127.0.0.1';
+    final url = 'http://$ip:${c.port}/$did/$tk';
+    showDialog(context: ctx, builder: (c) => AlertDialog(
+      title: const Text('绑定二维码'), content: Column(mainAxisSize: MainAxisSize.min, children: [
+        QrImageView(data: url, version: QrVersions.auto, size: 250, backgroundColor: Colors.white),
+        const SizedBox(height: 12),
+        Text(ip, style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: Theme.of(ctx).colorScheme.primary)),
+        const SizedBox(height: 4),
+        Text(url, style: const TextStyle(fontSize: 10, fontFamily: 'monospace')),
+      ]),
+      actions: [
+        TextButton(onPressed: () { Clipboard.setData(ClipboardData(text: url)); ScaffoldMessenger.of(ctx).showSnackBar(const SnackBar(content: Text('链接已复制'), behavior: SnackBarBehavior.floating)); }, child: const Text('复制链接')),
+        TextButton(onPressed: () => Navigator.pop(c), child: const Text('关闭')),
+      ],
+    ));
   }
 
-  /// 构建连接的客户端卡片
-  Widget _buildConnectedClientsCard(
-    BuildContext context,
-    AppLocalizations l10n,
-    ServerStatus status,
-  ) {
-    return Card(
-      margin: const EdgeInsets.symmetric(horizontal: 16),
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                Icon(
-                  Icons.devices,
-                  color: Theme.of(context).colorScheme.primary,
-                ),
-                const SizedBox(width: 8),
-                Text(
-                  l10n.connectedClients,
-                  style: Theme.of(context).textTheme.titleMedium,
-                ),
-              ],
-            ),
-            const Divider(),
-            _buildInfoRow(l10n.clientCount, '${status.connectedClients}'),
-            if (status.connectedClients == 0)
-              Padding(
-                padding: const EdgeInsets.only(top: 8),
-                child: Text(
-                  l10n.noClients,
-                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                        color: Theme.of(context).colorScheme.onSurfaceVariant,
-                      ),
-                ),
-              ),
-          ],
-        ),
-      ),
-    );
-  }
+  Widget _logCard(ThemeData t, List<String> logs, WidgetRef ref) => Card(margin: const EdgeInsets.symmetric(horizontal: 16), child: Padding(padding: const EdgeInsets.all(16), child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+    Row(children: [Icon(Icons.article, color: t.colorScheme.primary), const SizedBox(width: 8), const Text('服务端日志', style: TextStyle(fontWeight: FontWeight.bold)), const Spacer(), if (logs.isNotEmpty) TextButton(onPressed: () => ref.read(serverLogProvider.notifier).state = [], child: const Text('清除'))]),
+    const Divider(),
+    if (logs.isEmpty) const Padding(padding: EdgeInsets.all(16), child: Center(child: Text('暂无日志', style: TextStyle(color: Colors.grey))))
+    else SizedBox(height: 200, child: ListView.builder(itemCount: logs.length, itemBuilder: (_, i) => Padding(padding: const EdgeInsets.symmetric(vertical: 2), child: Text(logs[i], style: const TextStyle(fontSize: 12, fontFamily: 'monospace'))))),
+  ])));
 
-  /// 构建信息行
-  Widget _buildInfoRow(String label, String value) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 4),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        children: [
-          Text(
-            label,
-            style: const TextStyle(
-              color: Colors.grey,
-            ),
-          ),
-          Flexible(
-            child: Text(
-              value,
-              textAlign: TextAlign.end,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
+  Widget _netCard(BuildContext ctx, ThemeData t, AppLocalizations l) => Card(margin: const EdgeInsets.symmetric(horizontal: 16), child: Padding(padding: const EdgeInsets.all(16), child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+    Row(children: [Icon(Icons.wifi, color: t.colorScheme.primary), const SizedBox(width: 8), Text(l.networkInfo, style: t.textTheme.titleMedium)]), const Divider(),
+    FutureBuilder<List<String>>(future: _getIps(), builder: (_, snap) => snap.hasData ? Column(children: snap.data!.map((ip) => _row(l.ipAddress, ip)).toList()) : _row(l.ipAddress, l.detecting)),
+  ])));
 
-  /// 构建状态行
-  Widget _buildStatusRow(String label, bool isActive, String statusText) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 4),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        children: [
-          Text(
-            label,
-            style: const TextStyle(
-              color: Colors.grey,
-            ),
-          ),
-          Row(
-            children: [
-              Container(
-                width: 8,
-                height: 8,
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  color: isActive ? Colors.green : Colors.red,
-                ),
-              ),
-              const SizedBox(width: 8),
-              Text(statusText),
-            ],
-          ),
-        ],
-      ),
-    );
-  }
+  Widget _row(String a, String b) => Padding(padding: const EdgeInsets.symmetric(vertical: 4), child: Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [Text(a, style: const TextStyle(color: Colors.grey)), Flexible(child: Text(b, textAlign: TextAlign.end))]));
+  Widget _statusRow(String a, bool ok, String x) => Padding(padding: const EdgeInsets.symmetric(vertical: 4), child: Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [Text(a, style: const TextStyle(color: Colors.grey)), Row(children: [Container(width: 8, height: 8, decoration: BoxDecoration(shape: BoxShape.circle, color: ok ? Colors.green : Colors.red)), const SizedBox(width: 8), Text(x)])]));
 
-  /// 获取操作系统名称
-  String _getOsName(AppLocalizations l10n) {
-    if (Platform.isWindows) return 'Windows';
-    if (Platform.isMacOS) return 'macOS';
-    if (Platform.isLinux) return 'Linux';
-    if (Platform.isAndroid) return 'Android';
-    if (Platform.isIOS) return 'iOS';
-    return 'Unknown';
-  }
+  String get _os { if (Platform.isWindows) return 'Windows'; if (Platform.isMacOS) return 'macOS'; if (Platform.isLinux) return 'Linux'; if (Platform.isAndroid) return 'Android'; if (Platform.isIOS) return 'iOS'; return 'Unknown'; }
+  String get _host { try { return Platform.localHostname; } catch (_) { return 'Unknown'; } }
 
-  /// 获取主机名
-  String _getHostname() {
-    try {
-      return Platform.localHostname;
-    } catch (_) {
-      return 'Unknown';
-    }
-  }
-
-  /// 获取本机 IP 地址
-  Future<List<String>> _getLocalIps() async {
-    final ips = <String>[];
-    try {
-      for (final interface in await NetworkInterface.list(
-        type: InternetAddressType.IPv4,
-        includeLinkLocal: false,
-      )) {
-        for (final addr in interface.addresses) {
-          if (!addr.isLoopback) {
-            ips.add(addr.address);
-          }
-        }
-      }
-    } catch (_) {}
-    if (ips.isEmpty) {
-      ips.add('127.0.0.1');
-    }
-    return ips;
+  Future<List<String>> _getIps() async {
+    try { final ips = (await NetworkInterface.list(type: InternetAddressType.IPv4, includeLinkLocal: false)).expand((i) => i.addresses).where((a) => !a.isLoopback).map((a) => a.address).toList(); return ips.isEmpty ? ['127.0.0.1'] : ips; } catch (_) { return ['127.0.0.1']; }
   }
 }

@@ -222,12 +222,14 @@ jobs:
           flutter build apk --release
           --dart-define=APP_VERSION=${{ needs.resolve.outputs.version_name }}
           --dart-define=APP_BUILD_NUMBER=${{ needs.resolve.outputs.version_code }}
+          --build-number=${{ needs.resolve.outputs.version_code }}
 
       - name: Build debug APK
         run: >-
           flutter build apk --debug
           --dart-define=APP_VERSION=${{ needs.resolve.outputs.version_name }}
           --dart-define=APP_BUILD_NUMBER=${{ needs.resolve.outputs.version_code }}
+          --build-number=${{ needs.resolve.outputs.version_code }}
 
       # 项目名-v版本名_版本码-平台.apk
       - name: Rename APKs

@@ -137,6 +137,14 @@ class AppLocalizations {
   String get port => locale.languageCode == 'zh' ? '端口号' : 'Port';
   String get portHint =>
       locale.languageCode == 'zh' ? '默认 8080' : 'Default 8080';
+  String get scanAddDevice => locale.languageCode == 'zh' ? '扫一扫添加' : 'Scan to Add';
+  String get scanAddDeviceDesc =>
+      locale.languageCode == 'zh' ? '扫描二维码添加设备' : 'Scan QR code to add device';
+  String get accessTokenHint =>
+      locale.languageCode == 'zh' ? 'SHA256 访问令牌（可选）' : 'SHA256 access token (optional)';
+  String get verifyConnection =>
+      locale.languageCode == 'zh' ? '验证连通性' : 'Verify Connection';
+  String get verifying => locale.languageCode == 'zh' ? '验证中...' : 'Verifying...';
 
   String get enterDeviceName =>
       locale.languageCode == 'zh' ? '请输入设备名称' : 'Please enter device name';
@@ -336,6 +344,26 @@ class AppLocalizations {
   String get detailUploadSpeed => locale.languageCode == 'zh' ? '上行速率' : 'Upload';
   String get detailDownloadSpeed => locale.languageCode == 'zh' ? '下行速率' : 'Download';
   String get detailWaitingForData => locale.languageCode == 'zh' ? '等待数据...' : 'Waiting for data...';
+
+  // ==================== 扫描绑定 ====================
+  String get scanTitle => locale.languageCode == 'zh' ? '扫一扫添加设备' : 'Scan to Add';
+  String get scanHint =>
+      locale.languageCode == 'zh' ? '扫描对方设备的二维码，或粘贴连接 URL' : 'Scan QR code or paste connection URL';
+  String get scanPasteHint => locale.languageCode == 'zh' ? '粘贴二维码内容' : 'Paste QR content';
+  String get checkConnection => locale.languageCode == 'zh' ? '检查连通性' : 'Check Connection';
+  String get importDevice => locale.languageCode == 'zh' ? '导入到主页' : 'Import to Home';
+  String get bindDevice => locale.languageCode == 'zh' ? '绑定设备' : 'Bind Device';
+  String get bindDeviceDesc =>
+      locale.languageCode == 'zh' ? '生成二维码供其他设备扫描绑定' : 'Generate QR code for other devices to scan';
+  String get showBindQr =>
+      locale.languageCode == 'zh' ? '显示绑定二维码' : 'Show Bind QR Code';
+  String get startServiceFirst =>
+      locale.languageCode == 'zh' ? '请先启动服务' : 'Start service first';
+  String get copyLink => locale.languageCode == 'zh' ? '复制链接' : 'Copy Link';
+  String get linkCopied => locale.languageCode == 'zh' ? '链接已复制' : 'Link copied';
+  String get serverLog => locale.languageCode == 'zh' ? '服务端日志' : 'Server Log';
+  String get noLogs => locale.languageCode == 'zh' ? '暂无日志' : 'No logs';
+  String get clearLogs => locale.languageCode == 'zh' ? '清除' : 'Clear';
 }
 
 /// 本地化代理

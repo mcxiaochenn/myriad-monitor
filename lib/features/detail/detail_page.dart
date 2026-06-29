@@ -1,590 +1,263 @@
-import 'dart:math' as math;
+import 'dart:async';
 import 'package:flutter/material.dart';
+import '../../client/client_service.dart';
+import '../../client/device_manager.dart';
 import '../../l10n/app_localizations.dart';
 import 'chart_widget.dart';
 
 /// 设备详情页
-/// 展示单台设备的实时监控数据，包括 CPU、内存、GPU、磁盘、网络等信息
-class DeviceDetailPage extends StatelessWidget {
-  /// 设备名称
-  final String deviceName;
+///
+/// 接收 [ManagedDevice]，创建 [ClientService] 通过 HTTP 轮询拉取
+/// 真实的系统监控数据，替代原先的模拟数据。
+class DeviceDetailPage extends StatefulWidget {
+  final ManagedDevice device;
 
-  /// 设备 IP 地址
-  final String deviceIp;
+  const DeviceDetailPage({super.key, required this.device});
 
-  const DeviceDetailPage({
-    super.key,
-    required this.deviceName,
-    required this.deviceIp,
-  });
+  @override
+  State<DeviceDetailPage> createState() => _DeviceDetailPageState();
+}
+
+class _DeviceDetailPageState extends State<DeviceDetailPage> {
+  ClientService? _client;
+  StreamSubscription? _dataSub;
+  StreamSubscription? _statusSub;
+  SystemInfoData? _latestData;
+  ConnectionStatus _connectionStatus = ConnectionStatus.connecting;
+  String? _errorMessage;
+  final List<double> _cpuHistory = [];
+  final List<double> _uploadHistory = [];
+  final List<double> _downloadHistory = [];
+  static const int _maxHistory = 30;
+
+  @override
+  void initState() {
+    super.initState();
+    _connect();
+  }
+
+  @override
+  void dispose() {
+    _dataSub?.cancel();
+    _statusSub?.cancel();
+    _client?.disconnect();
+    super.dispose();
+  }
+
+  void _connect() {
+    final url = widget.device.httpUrl;
+    if (url.isEmpty) {
+      setState(() {
+        _connectionStatus = ConnectionStatus.error;
+        _errorMessage = '设备连接信息不完整（缺少 IP/端口/令牌）';
+      });
+      return;
+    }
+
+    _client?.disconnect();
+    _dataSub?.cancel();
+    _statusSub?.cancel();
+
+    _client = ClientService(serverUrl: url);
+
+    _statusSub = _client!.statusStream.listen((status) {
+      if (mounted) setState(() => _connectionStatus = status);
+    });
+
+    _dataSub = _client!.dataStream.listen((data) {
+      if (!mounted) return;
+      setState(() {
+        _latestData = data;
+        _connectionStatus = ConnectionStatus.connected;
+        _cpuHistory.add(data.cpuUsage);
+        _uploadHistory.add(data.uploadSpeed.toDouble());
+        _downloadHistory.add(data.downloadSpeed.toDouble());
+        if (_cpuHistory.length > _maxHistory) _cpuHistory.removeAt(0);
+        if (_uploadHistory.length > _maxHistory) _uploadHistory.removeAt(0);
+        if (_downloadHistory.length > _maxHistory) _downloadHistory.removeAt(0);
+      });
+    });
+
+    _client!.connect();
+  }
+
+  String _formatBytes(int bytes) {
+    if (bytes < 1024) return '$bytes B';
+    if (bytes < 1024 * 1024) return '${(bytes / 1024).toStringAsFixed(1)} KB';
+    if (bytes < 1024 * 1024 * 1024) return '${(bytes / (1024 * 1024)).toStringAsFixed(1)} MB';
+    return '${(bytes / (1024 * 1024 * 1024)).toStringAsFixed(2)} GB';
+  }
+
+  String _formatSpeed(double bps) {
+    if (bps < 1024) return '${bps.toStringAsFixed(1)} B/s';
+    if (bps < 1024 * 1024) return '${(bps / 1024).toStringAsFixed(1)} KB/s';
+    return '${(bps / (1024 * 1024)).toStringAsFixed(2)} MB/s';
+  }
+
+  String _formatTime(DateTime dt) =>
+      '${dt.hour.toString().padLeft(2, '0')}:${dt.minute.toString().padLeft(2, '0')}:${dt.second.toString().padLeft(2, '0')}';
+
+  Color get _statusColor => switch (_connectionStatus) {
+    ConnectionStatus.connected => Colors.green,
+    ConnectionStatus.connecting => Colors.orange,
+    _ => Colors.red,
+  };
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final l10n = AppLocalizations.of(context);
 
-    // 生成演示用的模拟数据
-    final cpuData = _generateDemoData(30, 10, 80);
-    final uploadData = _generateDemoData(30, 0, 35);
-    final downloadData = _generateDemoData(30, 5, 80);
+    final cpuData = _cpuHistory.isNotEmpty ? _cpuHistory : List.filled(_maxHistory, 0.0);
+    final uploadData = _uploadHistory.isNotEmpty ? _uploadHistory : List.filled(_maxHistory, 0.0);
+    final downloadData = _downloadHistory.isNotEmpty ? _downloadHistory : List.filled(_maxHistory, 0.0);
 
     return Scaffold(
-      // 应用栏：设备名称 + 返回按钮 + 状态指示灯
       appBar: AppBar(
-        title: Text(deviceName),
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back),
-          onPressed: () => Navigator.of(context).pop(),
-        ),
+        title: Text(widget.device.name),
+        leading: IconButton(icon: const Icon(Icons.arrow_back), onPressed: () => Navigator.pop(context)),
         actions: [
-          // 绿色状态指示灯
           Center(
             child: Container(
-              width: 10,
-              height: 10,
-              margin: const EdgeInsets.only(right: 16),
-              decoration: const BoxDecoration(
-                color: Colors.green,
-                shape: BoxShape.circle,
-              ),
+              width: 10, height: 10, margin: const EdgeInsets.only(right: 16),
+              decoration: BoxDecoration(color: _statusColor, shape: BoxShape.circle),
             ),
           ),
         ],
       ),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          children: [
-            // ===== 设备信息卡片 =====
-            _buildDeviceInfoCard(theme, l10n),
-            const SizedBox(height: 12),
-
-            // ===== CPU 使用率卡片 =====
-            _buildCpuCard(theme, l10n, cpuData),
-            const SizedBox(height: 12),
-
-            // ===== 内存卡片 =====
-            _buildMemoryCard(theme, l10n),
-            const SizedBox(height: 12),
-
-            // ===== GPU 卡片 =====
-            _buildGpuCard(theme, l10n),
-            const SizedBox(height: 12),
-
-            // ===== 磁盘卡片 =====
-            _buildDiskCard(theme, l10n),
-            const SizedBox(height: 12),
-
-            // ===== 网络卡片 =====
-            _buildNetworkCard(theme, l10n, uploadData, downloadData),
-          ],
-        ),
-      ),
+      body: _buildBody(theme, l10n, cpuData, uploadData, downloadData),
     );
   }
 
-  /// 生成模拟数据点
-  List<double> _generateDemoData(int count, double min, double max) {
-    final random = math.Random(42); // 固定种子，保证每次数据一致
-    return List.generate(count, (i) {
-      // 使用正弦波 + 随机噪声，生成更自然的波动
-      final base = (min + max) / 2;
-      final amplitude = (max - min) / 2;
-      final sine = math.sin(i * 0.3) * amplitude * 0.6;
-      final noise = (random.nextDouble() - 0.5) * amplitude * 0.4;
-      return (base + sine + noise).clamp(min, max);
-    });
+  Widget _buildBody(ThemeData theme, AppLocalizations l10n,
+      List<double> cpu, List<double> up, List<double> down) {
+    if (_connectionStatus == ConnectionStatus.connecting && _latestData == null) {
+      return const Center(child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
+        CircularProgressIndicator(), SizedBox(height: 16), Text('正在连接设备...'),
+      ]));
+    }
+    if (_connectionStatus == ConnectionStatus.error && _latestData == null) {
+      return Center(child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
+        const Icon(Icons.error_outline, size: 64, color: Colors.red),
+        const SizedBox(height: 16),
+        Text(_errorMessage ?? '连接失败', style: theme.textTheme.titleMedium),
+        const SizedBox(height: 16),
+        ElevatedButton(onPressed: () { setState(() { _connectionStatus = ConnectionStatus.connecting; _errorMessage = null; }); _connect(); }, child: const Text('重试')),
+      ]));
+    }
+
+    final d = _latestData;
+    return SingleChildScrollView(padding: const EdgeInsets.all(16), child: Column(children: [
+      _infoCard(theme, l10n, d), const SizedBox(height: 12),
+      _cpuCard(theme, l10n, cpu, d), const SizedBox(height: 12),
+      _memCard(theme, l10n, d), const SizedBox(height: 12),
+      _diskCard(theme, l10n, d), const SizedBox(height: 12),
+      _netCard(theme, l10n, up, down, d),
+    ]));
   }
 
-  // ============================================================
-  // 设备信息卡片
-  // ============================================================
+  // ── 设备信息 ──
+  Widget _infoCard(ThemeData t, AppLocalizations l, SystemInfoData? d) => Card(
+    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+    child: Padding(padding: const EdgeInsets.all(16), child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+      Row(children: [Icon(Icons.computer, color: t.colorScheme.primary), const SizedBox(width: 8), Text(l.detailDeviceInfo, style: t.textTheme.titleMedium)]),
+      const SizedBox(height: 16),
+      Row(mainAxisAlignment: MainAxisAlignment.spaceAround, children: [
+        _infoItem(t, Icons.badge, l.detailHostName, d?.deviceName ?? widget.device.name),
+        _infoItem(t, Icons.laptop_windows, l.detailOs, widget.device.ipAddress),
+        _infoItem(t, Icons.schedule, l.detailUptime, d != null ? _formatTime(d.timestamp) : '--'),
+      ]),
+    ])),
+  );
 
-  Widget _buildDeviceInfoCard(ThemeData theme, AppLocalizations l10n) {
+  Widget _infoItem(ThemeData t, IconData ic, String label, String v) => Column(children: [
+    Icon(ic, size: 28, color: t.colorScheme.primary), const SizedBox(height: 6),
+    Text(label, style: t.textTheme.bodySmall?.copyWith(color: t.colorScheme.onSurfaceVariant)),
+    const SizedBox(height: 4),
+    Text(v, style: t.textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w600)),
+  ]);
+
+  // ── CPU ──
+  Widget _cpuCard(ThemeData t, AppLocalizations l, List<double> data, SystemInfoData? d) {
+    final cur = d?.cpuUsage ?? 0;
     return Card(
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // 卡片标题
-            Row(
-              children: [
-                Icon(Icons.computer, color: theme.colorScheme.primary),
-                const SizedBox(width: 8),
-                Text(l10n.detailDeviceInfo, style: theme.textTheme.titleMedium),
-              ],
-            ),
-            const SizedBox(height: 16),
-            // 三项信息横向排列：主机名、操作系统、运行时长
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceAround,
-              children: [
-                _buildInfoItem(
-                  theme,
-                  Icons.badge,
-                  l10n.detailHostName,
-                  deviceName,
-                ),
-                _buildInfoItem(
-                  theme,
-                  Icons.laptop_windows,
-                  l10n.detailOs,
-                  'Windows 11',
-                ),
-                _buildInfoItem(
-                  theme,
-                  Icons.schedule,
-                  l10n.detailUptime,
-                  '3天 12小时',
-                ),
-              ],
-            ),
-          ],
-        ),
-      ),
+      child: Padding(padding: const EdgeInsets.all(16), child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        Row(children: [
+          Icon(Icons.memory, color: t.colorScheme.primary), const SizedBox(width: 8),
+          Text(l.detailCpuUsage, style: t.textTheme.titleMedium),
+          const Spacer(),
+          Text('${cur.toStringAsFixed(1)}%', style: t.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold)),
+        ]),
+        const SizedBox(height: 12),
+        RealtimeLineChart(dataPoints: data, title: l.detailCpuUsage, unit: '%', lineColor: Colors.green, maxY: 100, minY: 0, height: 180, intervalSeconds: 1),
+      ])),
     );
   }
 
-  /// 单个信息项：图标 + 标签 + 值
-  Widget _buildInfoItem(
-      ThemeData theme, IconData icon, String label, String value) {
-    return Column(
-      children: [
-        Icon(icon, size: 28, color: theme.colorScheme.primary),
-        const SizedBox(height: 6),
-        Text(
-          label,
-          style: theme.textTheme.bodySmall?.copyWith(
-            color: theme.colorScheme.onSurfaceVariant,
-          ),
-        ),
+  // ── 内存 ──
+  Widget _memCard(ThemeData t, AppLocalizations l, SystemInfoData? d) {
+    final used = d?.memoryUsed ?? 0; final total = d?.memoryTotal ?? 0;
+    final usage = total > 0 ? used / total : 0.0;
+    return Card(
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+      child: Padding(padding: const EdgeInsets.all(16), child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        Row(children: [Icon(Icons.storage, color: t.colorScheme.primary), const SizedBox(width: 8), Text(l.detailMemory, style: t.textTheme.titleMedium)]),
+        const SizedBox(height: 16),
+        Text(l.detailMemoryUsage(_formatBytes(used), _formatBytes(total)), style: t.textTheme.bodyMedium?.copyWith(color: t.colorScheme.onSurfaceVariant)),
+        const SizedBox(height: 8),
+        ClipRRect(borderRadius: BorderRadius.circular(8), child: LinearProgressIndicator(value: usage, minHeight: 10, backgroundColor: t.colorScheme.surfaceContainerHighest, valueColor: AlwaysStoppedAnimation(usage > 0.8 ? Colors.red : Colors.blue))),
         const SizedBox(height: 4),
-        Text(
-          value,
-          style: theme.textTheme.bodyMedium?.copyWith(
-            fontWeight: FontWeight.w600,
-          ),
-        ),
-      ],
+        Align(alignment: Alignment.centerRight, child: Text('${(usage * 100).toStringAsFixed(0)}%', style: t.textTheme.bodySmall?.copyWith(color: t.colorScheme.onSurfaceVariant))),
+      ])),
     );
   }
 
-  // ============================================================
-  // CPU 使用率卡片
-  // ============================================================
-
-  Widget _buildCpuCard(ThemeData theme, AppLocalizations l10n, List<double> cpuData) {
+  // ── 磁盘 ──
+  Widget _diskCard(ThemeData t, AppLocalizations l, SystemInfoData? d) {
+    final disks = d?.disks ?? [];
     return Card(
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // 卡片标题
-            Row(
-              children: [
-                Icon(Icons.memory, color: theme.colorScheme.primary),
-                const SizedBox(width: 8),
-                Text(l10n.detailCpuUsage, style: theme.textTheme.titleMedium),
-              ],
-            ),
-            const SizedBox(height: 12),
-            // 实时折线图
-            RealtimeLineChart(
-              dataPoints: cpuData,
-              title: l10n.detailCpuUsage,
-              unit: '%',
-              lineColor: Colors.green,
-              maxY: 100,
-              minY: 0,
-              height: 180,
-              intervalSeconds: 1,
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  // ============================================================
-  // 内存卡片
-  // ============================================================
-
-  Widget _buildMemoryCard(ThemeData theme, AppLocalizations l10n) {
-    const usedGb = 8.2;
-    const totalGb = 16.0;
-    const usage = usedGb / totalGb; // 使用比例
-
-    return Card(
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // 卡片标题
-            Row(
-              children: [
-                Icon(Icons.storage, color: theme.colorScheme.primary),
-                const SizedBox(width: 8),
-                Text(l10n.detailMemory, style: theme.textTheme.titleMedium),
-              ],
-            ),
-            const SizedBox(height: 16),
-            // 使用量文本
-            Text(
-              l10n.detailMemoryUsage(
-                '${usedGb.toStringAsFixed(1)} GB',
-                '${totalGb.toStringAsFixed(1)} GB',
-              ),
-              style: theme.textTheme.bodyMedium?.copyWith(
-                color: theme.colorScheme.onSurfaceVariant,
-              ),
-            ),
-            const SizedBox(height: 8),
-            // 进度条
-            ClipRRect(
-              borderRadius: BorderRadius.circular(8),
-              child: LinearProgressIndicator(
-                value: usage,
-                minHeight: 10,
-                backgroundColor:
-                    theme.colorScheme.surfaceContainerHighest,
-                valueColor: AlwaysStoppedAnimation<Color>(
-                  usage > 0.8 ? Colors.red : Colors.blue,
-                ),
-              ),
-            ),
+      child: Padding(padding: const EdgeInsets.all(16), child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        Row(children: [Icon(Icons.disc_full, color: t.colorScheme.primary), const SizedBox(width: 8), Text(l.detailDisk, style: t.textTheme.titleMedium)]),
+        const SizedBox(height: 16),
+        if (disks.isEmpty) Padding(padding: const EdgeInsets.symmetric(vertical: 16), child: Center(child: Text(l.detailWaitingForData, style: t.textTheme.bodyMedium?.copyWith(color: t.colorScheme.onSurfaceVariant))))
+        else ...disks.map((disk) {
+          final u = disk.totalSpace > 0 ? disk.usedSpace / disk.totalSpace : 0.0;
+          return Padding(padding: const EdgeInsets.only(bottom: 16), child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
+              Text('${disk.mountPoint}  ${disk.fileSystem}', style: t.textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w600)),
+              Text('${(u * 100).toStringAsFixed(0)}%', style: t.textTheme.bodySmall?.copyWith(color: t.colorScheme.onSurfaceVariant)),
+            ]),
+            const SizedBox(height: 6),
+            ClipRRect(borderRadius: BorderRadius.circular(6), child: LinearProgressIndicator(value: u, minHeight: 8, backgroundColor: t.colorScheme.surfaceContainerHighest, valueColor: AlwaysStoppedAnimation(u > 0.9 ? Colors.red : Colors.blue))),
             const SizedBox(height: 4),
-            // 百分比
-            Align(
-              alignment: Alignment.centerRight,
-              child: Text(
-                '${(usage * 100).toStringAsFixed(0)}%',
-                style: theme.textTheme.bodySmall?.copyWith(
-                  color: theme.colorScheme.onSurfaceVariant,
-                ),
-              ),
-            ),
-          ],
-        ),
-      ),
+            Text('已用 ${_formatBytes(disk.usedSpace)} / 共 ${_formatBytes(disk.totalSpace)}', style: t.textTheme.bodySmall?.copyWith(color: t.colorScheme.onSurfaceVariant)),
+          ]));
+        }),
+      ])),
     );
   }
 
-  // ============================================================
-  // GPU 卡片
-  // ============================================================
-
-  Widget _buildGpuCard(ThemeData theme, AppLocalizations l10n) {
+  // ── 网络 ──
+  Widget _netCard(ThemeData t, AppLocalizations l, List<double> up, List<double> down, SystemInfoData? d) {
+    final us = d?.uploadSpeed ?? 0; final ds = d?.downloadSpeed ?? 0;
+    final upMax = (up.isNotEmpty ? (up.reduce((a, b) => a > b ? a : b) * 1.2).clamp(50.0, 10000.0) : 50.0).toDouble();
+    final downMax = (down.isNotEmpty ? (down.reduce((a, b) => a > b ? a : b) * 1.2).clamp(50.0, 10000.0) : 100.0).toDouble();
     return Card(
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // 卡片标题
-            Row(
-              children: [
-                Icon(Icons.videocam, color: theme.colorScheme.primary),
-                const SizedBox(width: 8),
-                Text(l10n.detailGpu, style: theme.textTheme.titleMedium),
-              ],
-            ),
-            const SizedBox(height: 16),
-            // 2x2 网格布局
-            Row(
-              children: [
-                Expanded(
-                  child: _buildGpuItem(
-                    theme,
-                    Icons.developer_board,
-                    l10n.detailGpuModel,
-                    'NVIDIA RTX 4070',
-                  ),
-                ),
-                Expanded(
-                  child: _buildGpuItem(
-                    theme,
-                    Icons.thermostat,
-                    l10n.detailTemperature,
-                    '65°C',
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 12),
-            Row(
-              children: [
-                Expanded(
-                  child: _buildGpuItem(
-                    theme,
-                    Icons.memory,
-                    l10n.detailVram,
-                    '8 GB / 12 GB',
-                  ),
-                ),
-                Expanded(
-                  child: _buildGpuItem(
-                    theme,
-                    Icons.speed,
-                    l10n.detailUtilization,
-                    '45%',
-                  ),
-                ),
-              ],
-            ),
-          ],
-        ),
-      ),
+      child: Padding(padding: const EdgeInsets.all(16), child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        Row(children: [Icon(Icons.wifi, color: t.colorScheme.primary), const SizedBox(width: 8), Text(l.detailNetwork, style: t.textTheme.titleMedium)]),
+        const SizedBox(height: 16),
+        Row(mainAxisAlignment: MainAxisAlignment.spaceAround, children: [
+          Column(children: [Text(l.detailUploadSpeed, style: t.textTheme.bodySmall?.copyWith(color: t.colorScheme.onSurfaceVariant)), const SizedBox(height: 4), Text(_formatSpeed(us.toDouble()), style: t.textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w600, color: Colors.orange))]),
+          Column(children: [Text(l.detailDownloadSpeed, style: t.textTheme.bodySmall?.copyWith(color: t.colorScheme.onSurfaceVariant)), const SizedBox(height: 4), Text(_formatSpeed(ds.toDouble()), style: t.textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w600, color: Colors.cyan))]),
+        ]),
+        const SizedBox(height: 16),
+        RealtimeLineChart(dataPoints: up, title: l.detailUploadSpeed, unit: 'B/s', lineColor: Colors.orange, maxY: upMax, minY: 0, height: 140, intervalSeconds: 1),
+        const SizedBox(height: 16),
+        RealtimeLineChart(dataPoints: down, title: l.detailDownloadSpeed, unit: 'B/s', lineColor: Colors.cyan, maxY: downMax, minY: 0, height: 140, intervalSeconds: 1),
+      ])),
     );
   }
-
-  /// GPU 单项信息
-  Widget _buildGpuItem(
-      ThemeData theme, IconData icon, String label, String value) {
-    return Container(
-      padding: const EdgeInsets.all(12),
-      margin: const EdgeInsets.symmetric(horizontal: 4),
-      decoration: BoxDecoration(
-        color: theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.4),
-        borderRadius: BorderRadius.circular(12),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Icon(icon, size: 16, color: theme.colorScheme.primary),
-              const SizedBox(width: 4),
-              Text(
-                label,
-                style: theme.textTheme.bodySmall?.copyWith(
-                  color: theme.colorScheme.onSurfaceVariant,
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 6),
-          Text(
-            value,
-            style: theme.textTheme.bodyMedium?.copyWith(
-              fontWeight: FontWeight.w600,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  // ============================================================
-  // 磁盘卡片
-  // ============================================================
-
-  Widget _buildDiskCard(ThemeData theme, AppLocalizations l10n) {
-    // 磁盘分区演示数据
-    final partitions = [
-      const _DiskPartition('C:', 'NTFS', 186.5, 237.0),
-      const _DiskPartition('D:', 'NTFS', 412.3, 931.5),
-      const _DiskPartition('E:', 'NTFS', 28.7, 100.0),
-    ];
-
-    return Card(
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // 卡片标题
-            Row(
-              children: [
-                Icon(Icons.disc_full, color: theme.colorScheme.primary),
-                const SizedBox(width: 8),
-                Text(l10n.detailDisk, style: theme.textTheme.titleMedium),
-              ],
-            ),
-            const SizedBox(height: 16),
-            // 分区列表
-            ...partitions.map((p) => _buildDiskPartitionItem(theme, p)),
-          ],
-        ),
-      ),
-    );
-  }
-
-  /// 单个磁盘分区项
-  Widget _buildDiskPartitionItem(ThemeData theme, _DiskPartition partition) {
-    final usage = partition.used / partition.total;
-
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 16),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          // 分区名 + 文件系统 + 使用比例
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Text(
-                '${partition.name}  ${partition.filesystem}',
-                style: theme.textTheme.bodyMedium?.copyWith(
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
-              Text(
-                '${(usage * 100).toStringAsFixed(0)}%',
-                style: theme.textTheme.bodySmall?.copyWith(
-                  color: theme.colorScheme.onSurfaceVariant,
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 6),
-          // 进度条
-          ClipRRect(
-            borderRadius: BorderRadius.circular(6),
-            child: LinearProgressIndicator(
-              value: usage,
-              minHeight: 8,
-              backgroundColor:
-                  theme.colorScheme.surfaceContainerHighest,
-              valueColor: AlwaysStoppedAnimation<Color>(
-                usage > 0.9 ? Colors.red : Colors.blue,
-              ),
-            ),
-          ),
-          const SizedBox(height: 4),
-          // 已用 / 共
-          Text(
-            '已用 ${partition.used.toStringAsFixed(1)} GB / 共 ${partition.total.toStringAsFixed(1)} GB',
-            style: theme.textTheme.bodySmall?.copyWith(
-              color: theme.colorScheme.onSurfaceVariant,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  // ============================================================
-  // 网络卡片
-  // ============================================================
-
-  Widget _buildNetworkCard(
-    ThemeData theme,
-    AppLocalizations l10n,
-    List<double> uploadData,
-    List<double> downloadData,
-  ) {
-    // 当前速率取最新值
-    final currentUpload =
-        uploadData.isNotEmpty ? uploadData.last.toStringAsFixed(1) : '--';
-    final currentDownload =
-        downloadData.isNotEmpty ? downloadData.last.toStringAsFixed(1) : '--';
-
-    return Card(
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // 卡片标题
-            Row(
-              children: [
-                Icon(Icons.wifi, color: theme.colorScheme.primary),
-                const SizedBox(width: 8),
-                Text(l10n.detailNetwork, style: theme.textTheme.titleMedium),
-              ],
-            ),
-            const SizedBox(height: 16),
-
-            // 当前速率文字
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceAround,
-              children: [
-                Column(
-                  children: [
-                    Text(
-                      l10n.detailUploadSpeed,
-                      style: theme.textTheme.bodySmall?.copyWith(
-                        color: theme.colorScheme.onSurfaceVariant,
-                      ),
-                    ),
-                    const SizedBox(height: 4),
-                    Text(
-                      '$currentUpload MB/s',
-                      style: theme.textTheme.bodyMedium?.copyWith(
-                        fontWeight: FontWeight.w600,
-                        color: Colors.orange,
-                      ),
-                    ),
-                  ],
-                ),
-                Column(
-                  children: [
-                    Text(
-                      l10n.detailDownloadSpeed,
-                      style: theme.textTheme.bodySmall?.copyWith(
-                        color: theme.colorScheme.onSurfaceVariant,
-                      ),
-                    ),
-                    const SizedBox(height: 4),
-                    Text(
-                      '$currentDownload MB/s',
-                      style: theme.textTheme.bodyMedium?.copyWith(
-                        fontWeight: FontWeight.w600,
-                        color: Colors.cyan,
-                      ),
-                    ),
-                  ],
-                ),
-              ],
-            ),
-            const SizedBox(height: 16),
-
-            // 上行速率图表
-            RealtimeLineChart(
-              dataPoints: uploadData,
-              title: l10n.detailUploadSpeed,
-              unit: 'MB/s',
-              lineColor: Colors.orange,
-              maxY: 50,
-              minY: 0,
-              height: 140,
-              intervalSeconds: 1,
-            ),
-            const SizedBox(height: 16),
-
-            // 下行速率图表
-            RealtimeLineChart(
-              dataPoints: downloadData,
-              title: l10n.detailDownloadSpeed,
-              unit: 'MB/s',
-              lineColor: Colors.cyan,
-              maxY: 100,
-              minY: 0,
-              height: 140,
-              intervalSeconds: 1,
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-/// 磁盘分区数据模型（内部使用）
-class _DiskPartition {
-  final String name;
-  final String filesystem;
-  final double used; // 已用 GB
-  final double total; // 总共 GB
-
-  const _DiskPartition(this.name, this.filesystem, this.used, this.total);
 }

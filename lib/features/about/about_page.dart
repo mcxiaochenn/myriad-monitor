@@ -49,7 +49,7 @@ class AboutPage extends StatelessWidget {
                 const SizedBox(height: 4),
                 // 版本号
                 Text(
-                  'v${AppConfigConstants.appVersion}',
+                  'v${AppConfigConstants.appVersion} (build ${AppConfigConstants.appBuildNumber})',
                   style: theme.textTheme.bodyMedium?.copyWith(
                     color: colorScheme.onSurfaceVariant,
                   ),
