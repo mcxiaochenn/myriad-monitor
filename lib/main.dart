@@ -3,6 +3,7 @@ import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:hive_flutter/hive_flutter.dart';
 import 'app/app.dart';
+import 'core/app_logger.dart';
 import 'core/theme_provider.dart';
 import 'features/home/home_page.dart';
 import 'features/server/server_page.dart';
@@ -15,6 +16,10 @@ import 'l10n/locale_provider.dart';
 Future<void> main() async {
   // 确保 Flutter 绑定初始化
   WidgetsFlutterBinding.ensureInitialized();
+
+  // 初始化应用日志（写入文档目录，保留 5 份）
+  await AppLogger().init();
+  AppLogger().info('Myriad Monitor 启动');
 
   // 初始化 Hive 本地存储
   await Hive.initFlutter();

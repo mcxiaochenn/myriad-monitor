@@ -6,14 +6,16 @@ import 'package:qr_flutter/qr_flutter.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:uuid/uuid.dart';
 import '../../core/access_token.dart';
+import '../../core/app_logger.dart';
 import '../../server/server_service.dart';
 import '../../l10n/app_localizations.dart';
 import '../settings/settings_page.dart';
 
-// ── 日志 ──
+// ── 日志（UI 展示用，配合 AppLogger） ──
 final serverLogProvider = StateProvider<List<String>>((ref) => []);
 
 void addServerLog(WidgetRef ref, String msg) {
+  AppLogger().info(msg);
   final now = DateTime.now();
   final ts = '${now.hour.toString().padLeft(2, '0')}:${now.minute.toString().padLeft(2, '0')}:${now.second.toString().padLeft(2, '0')}';
   ref.read(serverLogProvider.notifier).state = ['[$ts] $msg', ...ref.read(serverLogProvider)].take(200).toList();
@@ -36,16 +38,28 @@ class ServerStatusNotifier extends StateNotifier<ServerStatus> {
 
   Future<void> toggleService(WidgetRef ref) async {
     if (state.isRunning) {
+      AppLogger().info('正在停止 HTTP 服务...');
       await _service?.stop(); _service = null;
       state = state.copyWith(isRunning: false);
       addServerLog(ref, 'HTTP 服务已停止');
     } else {
       final cfg = ref.read(serverConfigProvider);
+      AppLogger().info('正在启动 HTTP 服务 port=${cfg.port}...');
       _service = ServerService(port: cfg.port, address: cfg.address);
-      final did = ref.read(deviceIdProvider).value ?? const Uuid().v4();
-      final ok = await _service!.start(deviceId: did, deviceName: cfg.deviceName);
-      state = state.copyWith(isRunning: ok);
-      addServerLog(ref, ok ? 'HTTP 服务已启动 → 0.0.0.0:${cfg.port}' : 'HTTP 服务启动失败');
+      final did = ref.read(deviceIdProvider).value ?? '';
+      if (did.isEmpty) {
+        addServerLog(ref, '服务启动失败: 设备 ID 未就绪');
+        AppLogger().error('设备 ID 未就绪');
+        return;
+      }
+      try {
+        final ok = await _service!.start(deviceId: did, deviceName: cfg.deviceName);
+        state = state.copyWith(isRunning: ok);
+        addServerLog(ref, ok ? 'HTTP 服务已启动 → 0.0.0.0:${cfg.port}' : 'HTTP 服务启动失败');
+      } catch (e, st) {
+        AppLogger().error('HTTP 服务启动异常: $e\n$st');
+        addServerLog(ref, '服务启动异常: $e');
+      }
     }
   }
 

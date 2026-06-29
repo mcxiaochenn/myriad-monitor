@@ -2,12 +2,21 @@ import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../../core/constants.dart';
 import '../../l10n/app_localizations.dart';
+import '../developer/developer_page.dart';
 
 /// 关于页面
 ///
-/// 展示应用信息、版本、开发者信息和开源许可
-class AboutPage extends StatelessWidget {
+/// 展示应用信息、版本、开发者信息和开源许可。
+/// 连击应用图标 15 次进入开发者选项。
+class AboutPage extends StatefulWidget {
   const AboutPage({super.key});
+
+  @override
+  State<AboutPage> createState() => _AboutPageState();
+}
+
+class _AboutPageState extends State<AboutPage> {
+  int _logoTapCount = 0;
 
   @override
   Widget build(BuildContext context) {
@@ -27,15 +36,30 @@ class AboutPage extends StatelessWidget {
             padding: const EdgeInsets.symmetric(vertical: 40),
             child: Column(
               children: [
-                // 应用图标（主题自适应：浅色/深色模式使用对应 logo）
-                ClipRRect(
-                  borderRadius: BorderRadius.circular(24),
-                  child: Image.asset(
-                    Theme.of(context).brightness == Brightness.dark
-                        ? 'assets/applogo_night.png'
-                        : 'assets/applogo_light.png',
-                    width: 100,
-                    height: 100,
+                // 应用图标（主题自适应 + 连击 15 次进入开发者选项）
+                GestureDetector(
+                  onTap: () {
+                    _logoTapCount++;
+                    if (_logoTapCount >= 15) {
+                      _logoTapCount = 0;
+                      Navigator.of(context).push(
+                        MaterialPageRoute(builder: (_) => const DeveloperPage()),
+                      );
+                    }
+                    // 3 秒无连击则重置
+                    Future.delayed(const Duration(seconds: 3), () {
+                      if (mounted) _logoTapCount = 0;
+                    });
+                  },
+                  child: ClipRRect(
+                    borderRadius: BorderRadius.circular(24),
+                    child: Image.asset(
+                      Theme.of(context).brightness == Brightness.dark
+                          ? 'assets/applogo_night.png'
+                          : 'assets/applogo_light.png',
+                      width: 100,
+                      height: 100,
+                    ),
                   ),
                 ),
                 const SizedBox(height: 16),
