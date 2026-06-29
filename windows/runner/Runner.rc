@@ -89,13 +89,13 @@ BEGIN
     BEGIN
         BLOCK "040904e4"
         BEGIN
-            VALUE "CompanyName", "com.example" "\0"
-            VALUE "FileDescription", "myriad_monitor" "\0"
+            VALUE "CompanyName", "chendusk" "\0"
+            VALUE "FileDescription", "Myriad Monitor" "\0"
             VALUE "FileVersion", VERSION_AS_STRING "\0"
             VALUE "InternalName", "myriad_monitor" "\0"
-            VALUE "LegalCopyright", "Copyright (C) 2026 com.example. All rights reserved." "\0"
+            VALUE "LegalCopyright", "Copyright (C) 2026 chendusk. All rights reserved." "\0"
             VALUE "OriginalFilename", "myriad_monitor.exe" "\0"
-            VALUE "ProductName", "myriad_monitor" "\0"
+            VALUE "ProductName", "Myriad Monitor" "\0"
             VALUE "ProductVersion", VERSION_AS_STRING "\0"
         END
     END
