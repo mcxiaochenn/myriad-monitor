@@ -251,3 +251,44 @@ jobs:
         with:
           name: ios-release
           path: build/ios/iphoneos/
+
+  # ===================================================================
+  # WAA 打包：Windows + Android Release 产物合并下载
+  # ===================================================================
+  bundle-waa:
+    name: Bundle WAA (Windows + Android)
+    needs: [version, build-windows, build-android]
+    if: |
+      always() &&
+      (needs.version.result == 'success' || needs.version.result == 'skipped') &&
+      needs.build-windows.result == 'success' &&
+      needs.build-android.result == 'success'
+    runs-on: ubuntu-latest
+    env:
+      APP_VERSION: ${{ needs.version.outputs.version_name || 'dev' }}
+      APP_BUILD_NUMBER: ${{ needs.version.outputs.version_code || '0' }}
+    steps:
+      - name: Download Windows artifact
+        uses: actions/download-artifact@v7
+        with:
+          name: windows-release
+
+      - name: Download Android release artifact
+        uses: actions/download-artifact@v7
+        with:
+          name: android-release
+
+      - name: Create WAA combined package
+        run: |
+          if [ "$APP_BUILD_NUMBER" != "0" ]; then
+            NAME="waa(windows and android)-release-v${APP_VERSION}_${APP_BUILD_NUMBER}"
+          else
+            NAME="waa(windows and android)-dev"
+          fi
+          zip -r "${NAME}.zip" .
+          echo "Created: ${NAME}.zip"
+
+      - uses: actions/upload-artifact@v7
+        with:
+          name: waa-bundle
+          path: waa(windows and android)-*.zip
