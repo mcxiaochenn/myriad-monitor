@@ -242,11 +242,11 @@ jobs:
 
       - run: flutter create --project-name myriad_monitor --platforms ios .
 
-      # mobile_scanner 要求 iOS ≥15.5
+      # mobile_scanner 要求 iOS ≥15.5，Podfile 顶部插入 + Xcode 项目同步
       - name: Bump iOS deployment target
         run: |
-          sed -i '' 's/platform :ios.*/platform :ios, "15.5"/' ios/Podfile
-          grep -q 'platform :ios' ios/Podfile || echo 'platform :ios, "15.5"' >> ios/Podfile
+          echo 'platform :ios, "15.5"' | cat - ios/Podfile > ios/Podfile.tmp && mv ios/Podfile.tmp ios/Podfile
+          sed -i '' 's/IPHONEOS_DEPLOYMENT_TARGET = [0-9.]*/IPHONEOS_DEPLOYMENT_TARGET = 15.5/g' ios/Runner.xcodeproj/project.pbxproj
 
       - run: flutter pub get
 
