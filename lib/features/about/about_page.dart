@@ -28,18 +28,14 @@ class AboutPage extends StatelessWidget {
             child: Column(
               children: [
                 // 应用图标（主题自适应：浅色/深色模式使用对应 logo）
-                Container(
-                  width: 100,
-                  height: 100,
-                  decoration: BoxDecoration(
-                    color: colorScheme.primaryContainer,
-                    borderRadius: BorderRadius.circular(24),
-                  ),
-                  padding: const EdgeInsets.all(16),
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(24),
                   child: Image.asset(
                     Theme.of(context).brightness == Brightness.dark
                         ? 'assets/applogo_night.png'
                         : 'assets/applogo_light.png',
+                    width: 100,
+                    height: 100,
                   ),
                 ),
                 const SizedBox(height: 16),
