@@ -58,3 +58,7 @@ dev_dependencies:
 
 flutter:
   uses-material-design: true
+
+  assets:
+    - assets/applogo_light.png
+    - assets/applogo_night.png

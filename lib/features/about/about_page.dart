@@ -27,7 +27,7 @@ class AboutPage extends StatelessWidget {
             padding: const EdgeInsets.symmetric(vertical: 40),
             child: Column(
               children: [
-                // 应用图标
+                // 应用图标（主题自适应：浅色/深色模式使用对应 logo）
                 Container(
                   width: 100,
                   height: 100,
@@ -35,10 +35,11 @@ class AboutPage extends StatelessWidget {
                     color: colorScheme.primaryContainer,
                     borderRadius: BorderRadius.circular(24),
                   ),
-                  child: Icon(
-                    Icons.device_hub,
-                    size: 56,
-                    color: colorScheme.onPrimaryContainer,
+                  padding: const EdgeInsets.all(16),
+                  child: Image.asset(
+                    Theme.of(context).brightness == Brightness.dark
+                        ? 'assets/applogo_night.png'
+                        : 'assets/applogo_light.png',
                   ),
                 ),
                 const SizedBox(height: 16),
