@@ -2,7 +2,10 @@ import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:path_provider/path_provider.dart';
 
-/// 应用级日志系统 — 写入文档目录，保留最新 5 份，多余自动删除
+/// 应用级日志系统
+///
+/// 桌面端日志写入可执行文件目录 ./data/log/，移动端写入文档目录。
+/// 保留最新 5 份，多余自动删除。
 class AppLogger {
   static final AppLogger _instance = AppLogger._();
   factory AppLogger() => _instance;
@@ -23,8 +26,14 @@ class AppLogger {
   Future<void> init() async {
     if (_initialized) return;
     try {
-      final docs = await getApplicationDocumentsDirectory();
-      _logDir = '${docs.path}/logs';
+      if (Platform.isWindows || Platform.isMacOS || Platform.isLinux) {
+        // 桌面端：可执行文件同目录 ./data/log/
+        _logDir = '${File(Platform.resolvedExecutable).parent.path}/data/log';
+      } else {
+        // 移动端：应用文档目录
+        final docs = await getApplicationDocumentsDirectory();
+        _logDir = '${docs.path}/logs';
+      }
       final dir = Directory(_logDir!);
       if (!await dir.exists()) await dir.create(recursive: true);
       await _rotate();
