@@ -41,233 +41,62 @@ jobs:
           echo "git rev-list --count HEAD → version_code=$CODE"
 
   # ===================================================================
-  # Windows 构建
+  # 全平台构建（调用可复用工作流）
   # ===================================================================
   build-windows:
     name: Build Windows
     needs: [version]
     if: always() && (needs.version.result == 'success' || needs.version.result == 'skipped')
-    runs-on: windows-latest
-    env:
-      # version job 被跳过（PR）时使用回退值
-      APP_VERSION: ${{ needs.version.outputs.version_name || 'dev' }}
-      APP_BUILD_NUMBER: ${{ needs.version.outputs.version_code || '0' }}
-    steps:
-      - uses: actions/checkout@v7
+    uses: ./.github/workflows/build-platforms.yml
+    with:
+      platform: windows
+      app_version: ${{ needs.version.outputs.version_name || 'dev' }}
+      build_number: ${{ needs.version.outputs.version_code || '0' }}
+    secrets: inherit
 
-      - uses: subosito/flutter-action@v2
-        with:
-          channel: stable
-
-      - run: flutter create --project-name myriad_monitor --platforms windows .
-
-      # 防御性恢复自定义文件（flutter create 可能覆盖）
-      - run: git checkout -- windows/runner/Runner.rc windows/runner/resources/ || true
-
-      - run: flutter pub get
-
-      # 编译时注入版本号，实现 App UI 版本自动同步
-      - run: >-
-          flutter build windows --release
-          --dart-define=APP_VERSION=${{ env.APP_VERSION }}
-          --dart-define=APP_BUILD_NUMBER=${{ env.APP_BUILD_NUMBER }}
-
-      - name: Create ZIP
-        shell: pwsh
-        run: |
-          $ver = if ("${{ env.APP_BUILD_NUMBER }}" -ne "0") {
-            "v${{ env.APP_VERSION }}_${{ env.APP_BUILD_NUMBER }}"
-          } else {
-            "dev"
-          }
-          Compress-Archive -Path build/windows/x64/runner/Release/* -DestinationPath "myriad-monitor-$ver-windows.zip"
-
-      - uses: actions/upload-artifact@v7
-        with:
-          name: windows-release
-          path: myriad-monitor-*-windows.zip
-
-  # ===================================================================
-  # Android 构建
-  # ===================================================================
-  build-android:
-    name: Build Android
-    needs: [version]
-    if: always() && (needs.version.result == 'success' || needs.version.result == 'skipped')
-    runs-on: ubuntu-latest
-    env:
-      APP_VERSION: ${{ needs.version.outputs.version_name || 'dev' }}
-      APP_BUILD_NUMBER: ${{ needs.version.outputs.version_code || '0' }}
-    steps:
-      - uses: actions/checkout@v7
-
-      - uses: actions/setup-java@v5
-        with:
-          distribution: 'zulu'
-          java-version: '17'
-
-      - uses: subosito/flutter-action@v2
-        with:
-          channel: stable
-
-      - run: flutter create --project-name myriad_monitor --platforms android .
-
-      - run: flutter pub get
-
-      # 固定签名：从 GitHub Secrets 解码 keystore 并写入凭据文件
-      # 同时防御性清理 flutter create 可能重新添加的 android.newDsl=false
-      - name: Setup signing
-        run: |
-          echo "${{ secrets.ANDROID_KEYSTORE_BASE64 }}" | base64 --decode > android/app/upload-keystore.jks
-          cat <<EOF > android/key.properties
-          storePassword=${{ secrets.KEY_STORE_PASSWORD }}
-          keyPassword=${{ secrets.KEY_PASSWORD }}
-          keyAlias=${{ secrets.KEY_ALIAS }}
-          storeFile=upload-keystore.jks
-          EOF
-          sed -i '/^android\.newDsl=/d' android/gradle.properties
-
-      - run: >-
-          flutter build apk --release
-          --dart-define=APP_VERSION=${{ env.APP_VERSION }}
-          --dart-define=APP_BUILD_NUMBER=${{ env.APP_BUILD_NUMBER }}
-          --build-number=${{ env.APP_BUILD_NUMBER }}
-
-      - run: >-
-          flutter build apk --debug
-          --dart-define=APP_VERSION=${{ env.APP_VERSION }}
-          --dart-define=APP_BUILD_NUMBER=${{ env.APP_BUILD_NUMBER }}
-          --build-number=${{ env.APP_BUILD_NUMBER }}
-
-      - name: Rename APKs
-        run: |
-          if [ "$APP_BUILD_NUMBER" != "0" ]; then
-            PREFIX="myriad-monitor-v${APP_VERSION}_${APP_BUILD_NUMBER}"
-          else
-            PREFIX="myriad-monitor-dev"
-          fi
-          mv build/app/outputs/flutter-apk/app-release.apk "${PREFIX}-android-release.apk"
-          mv build/app/outputs/flutter-apk/app-debug.apk "${PREFIX}-android-debug.apk"
-
-      - uses: actions/upload-artifact@v7
-        with:
-          name: android-release
-          path: myriad-monitor-*-android-release.apk
-
-      - uses: actions/upload-artifact@v7
-        with:
-          name: android-debug
-          path: myriad-monitor-*-android-debug.apk
-
-  # ===================================================================
-  # macOS 构建
-  # ===================================================================
   build-macos:
     name: Build macOS
     needs: [version]
     if: always() && (needs.version.result == 'success' || needs.version.result == 'skipped')
-    runs-on: macos-latest
-    env:
-      APP_VERSION: ${{ needs.version.outputs.version_name || 'dev' }}
-      APP_BUILD_NUMBER: ${{ needs.version.outputs.version_code || '0' }}
-    steps:
-      - uses: actions/checkout@v7
+    uses: ./.github/workflows/build-platforms.yml
+    with:
+      platform: macos
+      app_version: ${{ needs.version.outputs.version_name || 'dev' }}
+      build_number: ${{ needs.version.outputs.version_code || '0' }}
+    secrets: inherit
 
-      - uses: subosito/flutter-action@v2
-        with:
-          channel: stable
-
-      - run: flutter create --project-name myriad_monitor --platforms macos .
-
-      # 防御性恢复自定义图标（flutter create 可能覆盖）
-      - run: git checkout -- macos/Runner/Assets.xcassets/AppIcon.appiconset/ || true
-
-      - run: flutter pub get
-
-      - run: >-
-          flutter build macos --release
-          --dart-define=APP_VERSION=${{ env.APP_VERSION }}
-          --dart-define=APP_BUILD_NUMBER=${{ env.APP_BUILD_NUMBER }}
-
-      - uses: actions/upload-artifact@v7
-        with:
-          name: macos-release
-          path: build/macos/Build/Products/Release/
-
-  # ===================================================================
-  # Linux 构建
-  # ===================================================================
   build-linux:
     name: Build Linux
     needs: [version]
     if: always() && (needs.version.result == 'success' || needs.version.result == 'skipped')
-    runs-on: ubuntu-latest
-    env:
-      APP_VERSION: ${{ needs.version.outputs.version_name || 'dev' }}
-      APP_BUILD_NUMBER: ${{ needs.version.outputs.version_code || '0' }}
-    steps:
-      - uses: actions/checkout@v7
+    uses: ./.github/workflows/build-platforms.yml
+    with:
+      platform: linux
+      app_version: ${{ needs.version.outputs.version_name || 'dev' }}
+      build_number: ${{ needs.version.outputs.version_code || '0' }}
+    secrets: inherit
 
-      - uses: subosito/flutter-action@v2
-        with:
-          channel: stable
+  build-android:
+    name: Build Android
+    needs: [version]
+    if: always() && (needs.version.result == 'success' || needs.version.result == 'skipped')
+    uses: ./.github/workflows/build-platforms.yml
+    with:
+      platform: android
+      app_version: ${{ needs.version.outputs.version_name || 'dev' }}
+      build_number: ${{ needs.version.outputs.version_code || '0' }}
+    secrets: inherit
 
-      - run: sudo apt-get update && sudo apt-get install -y ninja-build libgtk-3-dev
-
-      - run: flutter create --project-name myriad_monitor --platforms linux .
-
-      # 防御性恢复自定义图标
-      - run: git checkout -- linux/packaging/icons/ || true
-
-      - run: flutter pub get
-
-      - run: >-
-          flutter build linux --release
-          --dart-define=APP_VERSION=${{ env.APP_VERSION }}
-          --dart-define=APP_BUILD_NUMBER=${{ env.APP_BUILD_NUMBER }}
-
-      - uses: actions/upload-artifact@v7
-        with:
-          name: linux-release
-          path: build/linux/x64/release/bundle/
-
-  # ===================================================================
-  # iOS 构建
-  # ===================================================================
   build-ios:
     name: Build iOS
     needs: [version]
     if: always() && (needs.version.result == 'success' || needs.version.result == 'skipped')
-    runs-on: macos-latest
-    env:
-      APP_VERSION: ${{ needs.version.outputs.version_name || 'dev' }}
-      APP_BUILD_NUMBER: ${{ needs.version.outputs.version_code || '0' }}
-    steps:
-      - uses: actions/checkout@v7
-
-      - uses: subosito/flutter-action@v2
-        with:
-          channel: stable
-
-      - run: flutter create --project-name myriad_monitor --platforms ios .
-
-      # mobile_scanner 要求 iOS ≥15.5，Podfile 顶部插入 + Xcode 项目同步
-      - name: Bump iOS deployment target
-        run: |
-          echo 'platform :ios, "15.5"' | cat - ios/Podfile > ios/Podfile.tmp && mv ios/Podfile.tmp ios/Podfile
-          sed -i '' 's/IPHONEOS_DEPLOYMENT_TARGET = [0-9.]*/IPHONEOS_DEPLOYMENT_TARGET = 15.5/g' ios/Runner.xcodeproj/project.pbxproj
-
-      - run: flutter pub get
-
-      - run: >-
-          flutter build ios --release --no-codesign
-          --dart-define=APP_VERSION=${{ env.APP_VERSION }}
-          --dart-define=APP_BUILD_NUMBER=${{ env.APP_BUILD_NUMBER }}
-
-      - uses: actions/upload-artifact@v7
-        with:
-          name: ios-release
-          path: build/ios/iphoneos/
+    uses: ./.github/workflows/build-platforms.yml
+    with:
+      platform: ios
+      app_version: ${{ needs.version.outputs.version_name || 'dev' }}
+      build_number: ${{ needs.version.outputs.version_code || '0' }}
+    secrets: inherit
 
   # ===================================================================
   # WAA 打包：Windows + Android Release 产物合并下载
@@ -288,7 +117,7 @@ jobs:
       - name: Download Windows artifact
         uses: actions/download-artifact@v7
         with:
-          name: windows-release
+          name: windows-portable
 
       - name: Download Android release artifact
         uses: actions/download-artifact@v7

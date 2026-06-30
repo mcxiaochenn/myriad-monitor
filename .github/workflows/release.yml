@@ -48,246 +48,62 @@ jobs:
           echo "Resolved tag: $TAG (event: ${{ github.event_name }})"
 
   # ===================================================================
-  # Windows 构建
+  # 全平台构建（调用可复用工作流，release_mode 开启额外打包）
   # ===================================================================
   build-windows:
     name: Build Windows
     needs: [resolve]
-    runs-on: windows-latest
-    steps:
-      - uses: actions/checkout@v7
+    uses: ./.github/workflows/build-platforms.yml
+    with:
+      platform: windows
+      app_version: ${{ needs.resolve.outputs.version_name }}
+      build_number: ${{ needs.resolve.outputs.version_code }}
+      release_mode: true
+    secrets: inherit
 
-      - uses: subosito/flutter-action@v2
-        with:
-          channel: stable
-
-      - run: flutter create --project-name myriad_monitor --platforms windows .
-
-      - run: flutter pub get
-
-      # 编译时注入版本号，实现 App UI 版本自动同步
-      - run: >-
-          flutter build windows --release
-          --dart-define=APP_VERSION=${{ needs.resolve.outputs.version_name }}
-          --dart-define=APP_BUILD_NUMBER=${{ needs.resolve.outputs.version_code }}
-
-      # 版本化命名：项目名-v版本名_版本码-平台.格式
-      - name: Create portable ZIP
-        run: |
-          Compress-Archive -Path build/windows/x64/runner/Release/* `
-            -DestinationPath "myriad-monitor-v${{ needs.resolve.outputs.version_name }}_${{ needs.resolve.outputs.version_code }}-windows-portable.zip"
-
-      - name: Install Inno Setup
-        run: choco install innosetup -y
-
-      # 同步 installer 版本号
-      - name: Update installer version
-        run: |
-          (Get-Content windows\installer.iss) `
-            -replace 'AppVersion=.*', 'AppVersion=${{ needs.resolve.outputs.version_name }}' |
-          Set-Content windows\installer.iss
-
-      - name: Build installer
-        run: |
-          & "C:\Program Files (x86)\Inno Setup 6\ISCC.exe" windows\installer.iss
-
-      - name: Rename installer
-        run: |
-          $installer = Get-ChildItem build/windows/installer/*.exe | Select-Object -First 1
-          Rename-Item $installer.FullName "myriad-monitor-v${{ needs.resolve.outputs.version_name }}_${{ needs.resolve.outputs.version_code }}-windows-installer.exe"
-
-      - uses: actions/upload-artifact@v7
-        with:
-          name: windows-portable
-          path: myriad-monitor-v*_*-windows-portable.zip
-
-      - uses: actions/upload-artifact@v7
-        with:
-          name: windows-installer
-          path: myriad-monitor-v*_*-windows-installer.exe
-          if-no-files-found: warn
-
-  # ===================================================================
-  # macOS 构建
-  # ===================================================================
   build-macos:
     name: Build macOS
     needs: [resolve]
-    runs-on: macos-latest
-    steps:
-      - uses: actions/checkout@v7
+    uses: ./.github/workflows/build-platforms.yml
+    with:
+      platform: macos
+      app_version: ${{ needs.resolve.outputs.version_name }}
+      build_number: ${{ needs.resolve.outputs.version_code }}
+      release_mode: true
+    secrets: inherit
 
-      - uses: subosito/flutter-action@v2
-        with:
-          channel: stable
-
-      - run: flutter create --project-name myriad_monitor --platforms macos .
-
-      # 防御性恢复自定义图标
-      - run: git checkout -- macos/Runner/Assets.xcassets/AppIcon.appiconset/ || true
-
-      - run: flutter pub get
-
-      - run: >-
-          flutter build macos --release
-          --dart-define=APP_VERSION=${{ needs.resolve.outputs.version_name }}
-          --dart-define=APP_BUILD_NUMBER=${{ needs.resolve.outputs.version_code }}
-
-      - name: Create DMG
-        run: |
-          APP_PATH=$(find build/macos -name "*.app" -type d | head -1)
-          if [ -z "$APP_PATH" ]; then
-            echo "Error: .app file not found"
-            exit 1
-          fi
-          echo "Found app at: $APP_PATH"
-          hdiutil create -volname "Myriad Monitor" -srcfolder "$APP_PATH" -ov -format UDZO \
-            "myriad-monitor-v${{ needs.resolve.outputs.version_name }}_${{ needs.resolve.outputs.version_code }}-macos.dmg"
-
-      - uses: actions/upload-artifact@v7
-        with:
-          name: macos-dmg
-          path: myriad-monitor-v*_*-macos.dmg
-
-  # ===================================================================
-  # Linux 构建
-  # ===================================================================
   build-linux:
     name: Build Linux
     needs: [resolve]
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v7
+    uses: ./.github/workflows/build-platforms.yml
+    with:
+      platform: linux
+      app_version: ${{ needs.resolve.outputs.version_name }}
+      build_number: ${{ needs.resolve.outputs.version_code }}
+      release_mode: true
+    secrets: inherit
 
-      - uses: subosito/flutter-action@v2
-        with:
-          channel: stable
-
-      - run: sudo apt-get update && sudo apt-get install -y ninja-build libgtk-3-dev
-
-      - run: flutter create --project-name myriad_monitor --platforms linux .
-
-      # 防御性恢复自定义图标
-      - run: git checkout -- linux/packaging/icons/ || true
-
-      - run: flutter pub get
-
-      - run: >-
-          flutter build linux --release
-          --dart-define=APP_VERSION=${{ needs.resolve.outputs.version_name }}
-          --dart-define=APP_BUILD_NUMBER=${{ needs.resolve.outputs.version_code }}
-
-      - name: Create tar.gz
-        run: |
-          cd build/linux/x64/release/bundle/
-          tar -czf "../../../../../myriad-monitor-v${{ needs.resolve.outputs.version_name }}_${{ needs.resolve.outputs.version_code }}-linux.tar.gz" *
-
-      - uses: actions/upload-artifact@v7
-        with:
-          name: linux-bundle
-          path: myriad-monitor-v*_*-linux.tar.gz
-
-  # ===================================================================
-  # Android 构建
-  # ===================================================================
   build-android:
     name: Build Android
     needs: [resolve]
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v7
+    uses: ./.github/workflows/build-platforms.yml
+    with:
+      platform: android
+      app_version: ${{ needs.resolve.outputs.version_name }}
+      build_number: ${{ needs.resolve.outputs.version_code }}
+      release_mode: true
+    secrets: inherit
 
-      - uses: actions/setup-java@v5
-        with:
-          distribution: 'zulu'
-          java-version: '17'
-
-      - uses: subosito/flutter-action@v2
-        with:
-          channel: stable
-
-      - run: flutter create --project-name myriad_monitor --platforms android .
-
-      - run: flutter pub get
-
-      # 固定签名：从 GitHub Secrets 解码 keystore 并写入凭据文件
-      # 同时防御性清理 flutter create 可能重新添加的 android.newDsl=false
-      - name: Setup signing
-        run: |
-          echo "${{ secrets.ANDROID_KEYSTORE_BASE64 }}" | base64 --decode > android/app/upload-keystore.jks
-          cat <<EOF > android/key.properties
-          storePassword=${{ secrets.KEY_STORE_PASSWORD }}
-          keyPassword=${{ secrets.KEY_PASSWORD }}
-          keyAlias=${{ secrets.KEY_ALIAS }}
-          storeFile=upload-keystore.jks
-          EOF
-          sed -i '/^android\.newDsl=/d' android/gradle.properties
-
-      - name: Build release APK
-        run: >-
-          flutter build apk --release
-          --dart-define=APP_VERSION=${{ needs.resolve.outputs.version_name }}
-          --dart-define=APP_BUILD_NUMBER=${{ needs.resolve.outputs.version_code }}
-          --build-number=${{ needs.resolve.outputs.version_code }}
-
-      - name: Build debug APK
-        run: >-
-          flutter build apk --debug
-          --dart-define=APP_VERSION=${{ needs.resolve.outputs.version_name }}
-          --dart-define=APP_BUILD_NUMBER=${{ needs.resolve.outputs.version_code }}
-          --build-number=${{ needs.resolve.outputs.version_code }}
-
-      # 项目名-v版本名_版本码-平台.apk
-      - name: Rename APKs
-        run: |
-          VER="${{ needs.resolve.outputs.version_name }}"
-          CODE="${{ needs.resolve.outputs.version_code }}"
-          mv build/app/outputs/flutter-apk/app-release.apk "myriad-monitor-v${VER}_${CODE}-android-release.apk"
-          mv build/app/outputs/flutter-apk/app-debug.apk "myriad-monitor-v${VER}_${CODE}-android-debug.apk"
-
-      - uses: actions/upload-artifact@v7
-        with:
-          name: android-release
-          path: myriad-monitor-v*_*-android-release.apk
-
-      - uses: actions/upload-artifact@v7
-        with:
-          name: android-debug
-          path: myriad-monitor-v*_*-android-debug.apk
-
-  # ===================================================================
-  # iOS 构建
-  # ===================================================================
   build-ios:
     name: Build iOS
     needs: [resolve]
-    runs-on: macos-latest
-    steps:
-      - uses: actions/checkout@v7
-
-      - uses: subosito/flutter-action@v2
-        with:
-          channel: stable
-
-      - run: flutter create --project-name myriad_monitor --platforms ios .
-
-      # mobile_scanner 要求 iOS ≥15.5，Podfile 顶部插入 + Xcode 项目同步
-      - name: Bump iOS deployment target
-        run: |
-          echo 'platform :ios, "15.5"' | cat - ios/Podfile > ios/Podfile.tmp && mv ios/Podfile.tmp ios/Podfile
-          sed -i '' 's/IPHONEOS_DEPLOYMENT_TARGET = [0-9.]*/IPHONEOS_DEPLOYMENT_TARGET = 15.5/g' ios/Runner.xcodeproj/project.pbxproj
-
-      - run: flutter pub get
-
-      - run: >-
-          flutter build ios --release --no-codesign
-          --dart-define=APP_VERSION=${{ needs.resolve.outputs.version_name }}
-          --dart-define=APP_BUILD_NUMBER=${{ needs.resolve.outputs.version_code }}
-
-      - uses: actions/upload-artifact@v7
-        with:
-          name: ios-release
-          path: build/ios/iphoneos/
+    uses: ./.github/workflows/build-platforms.yml
+    with:
+      platform: ios
+      app_version: ${{ needs.resolve.outputs.version_name }}
+      build_number: ${{ needs.resolve.outputs.version_code }}
+      release_mode: true
+    secrets: inherit
 
   # ===================================================================
   # 创建 GitHub Release

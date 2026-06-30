@@ -1,0 +1,307 @@
+name: Build Platforms
+
+on:
+  workflow_call:
+    inputs:
+      platform:
+        description: '目标平台（windows/macos/linux/android/ios）'
+        required: true
+        type: string
+      app_version:
+        description: '应用版本名（如 0.0.1 或 dev）'
+        required: true
+        type: string
+      build_number:
+        description: '版本码（如 10092 或 0）'
+        required: true
+        type: string
+      release_mode:
+        description: '是否为 Release 模式（额外打包 DMG/tar.gz/installer）'
+        required: false
+        type: boolean
+        default: false
+
+jobs:
+  # ===================================================================
+  # Windows
+  # ===================================================================
+  windows:
+    name: Build Windows
+    if: inputs.platform == 'windows'
+    runs-on: windows-latest
+    env:
+      APP_VERSION: ${{ inputs.app_version }}
+      APP_BUILD_NUMBER: ${{ inputs.build_number }}
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+
+      - run: flutter create --project-name myriad_monitor --platforms windows .
+
+      # 防御性恢复自定义文件（flutter create 可能覆盖）
+      - run: git checkout -- windows/runner/Runner.rc windows/runner/resources/ || true
+
+      - run: flutter pub get
+
+      - run: >-
+          flutter build windows --release
+          --dart-define=APP_VERSION=${{ inputs.app_version }}
+          --dart-define=APP_BUILD_NUMBER=${{ inputs.build_number }}
+
+      # ---- 通用产物：Portable ZIP ----
+      - name: Create portable ZIP
+        shell: pwsh
+        run: |
+          $ver = if ("${{ inputs.build_number }}" -ne "0") {
+            "v${{ inputs.app_version }}_${{ inputs.build_number }}"
+          } else {
+            "dev"
+          }
+          Compress-Archive -Path build/windows/x64/runner/Release/* -DestinationPath "myriad-monitor-$ver-windows-portable.zip"
+
+      - uses: actions/upload-artifact@v7
+        with:
+          name: windows-portable
+          path: myriad-monitor-*-windows-portable.zip
+
+      # ---- Release 额外产物：Inno Setup 安装包 ----
+      - name: Install Inno Setup
+        if: inputs.release_mode
+        run: choco install innosetup -y
+
+      - name: Update installer version
+        if: inputs.release_mode
+        run: |
+          (Get-Content windows\installer.iss) `
+            -replace 'AppVersion=.*', 'AppVersion=${{ inputs.app_version }}' |
+          Set-Content windows\installer.iss
+
+      - name: Build installer
+        if: inputs.release_mode
+        run: |
+          & "C:\Program Files (x86)\Inno Setup 6\ISCC.exe" windows\installer.iss
+
+      - name: Rename installer
+        if: inputs.release_mode
+        run: |
+          $installer = Get-ChildItem build/windows/installer/*.exe | Select-Object -First 1
+          Rename-Item $installer.FullName "myriad-monitor-v${{ inputs.app_version }}_${{ inputs.build_number }}-windows-installer.exe"
+
+      - uses: actions/upload-artifact@v7
+        if: inputs.release_mode
+        with:
+          name: windows-installer
+          path: myriad-monitor-v*_*-windows-installer.exe
+          if-no-files-found: warn
+
+  # ===================================================================
+  # macOS
+  # ===================================================================
+  macos:
+    name: Build macOS
+    if: inputs.platform == 'macos'
+    runs-on: macos-latest
+    env:
+      APP_VERSION: ${{ inputs.app_version }}
+      APP_BUILD_NUMBER: ${{ inputs.build_number }}
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+
+      - run: flutter create --project-name myriad_monitor --platforms macos .
+
+      # 防御性恢复自定义图标
+      - run: git checkout -- macos/Runner/Assets.xcassets/AppIcon.appiconset/ || true
+
+      - run: flutter pub get
+
+      - run: >-
+          flutter build macos --release
+          --dart-define=APP_VERSION=${{ inputs.app_version }}
+          --dart-define=APP_BUILD_NUMBER=${{ inputs.build_number }}
+
+      - uses: actions/upload-artifact@v7
+        with:
+          name: macos-release
+          path: build/macos/Build/Products/Release/
+
+      # ---- Release 额外产物：DMG ----
+      - name: Create DMG
+        if: inputs.release_mode
+        run: |
+          APP_PATH=$(find build/macos -name "*.app" -type d | head -1)
+          if [ -z "$APP_PATH" ]; then
+            echo "Error: .app file not found"
+            exit 1
+          fi
+          echo "Found app at: $APP_PATH"
+          hdiutil create -volname "Myriad Monitor" -srcfolder "$APP_PATH" -ov -format UDZO \
+            "myriad-monitor-v${{ inputs.app_version }}_${{ inputs.build_number }}-macos.dmg"
+
+      - uses: actions/upload-artifact@v7
+        if: inputs.release_mode
+        with:
+          name: macos-dmg
+          path: myriad-monitor-v*_*-macos.dmg
+
+  # ===================================================================
+  # Linux
+  # ===================================================================
+  linux:
+    name: Build Linux
+    if: inputs.platform == 'linux'
+    runs-on: ubuntu-latest
+    env:
+      APP_VERSION: ${{ inputs.app_version }}
+      APP_BUILD_NUMBER: ${{ inputs.build_number }}
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+
+      - run: sudo apt-get update && sudo apt-get install -y ninja-build libgtk-3-dev
+
+      - run: flutter create --project-name myriad_monitor --platforms linux .
+
+      # 防御性恢复自定义图标
+      - run: git checkout -- linux/packaging/icons/ || true
+
+      - run: flutter pub get
+
+      - run: >-
+          flutter build linux --release
+          --dart-define=APP_VERSION=${{ inputs.app_version }}
+          --dart-define=APP_BUILD_NUMBER=${{ inputs.build_number }}
+
+      - uses: actions/upload-artifact@v7
+        with:
+          name: linux-release
+          path: build/linux/x64/release/bundle/
+
+      # ---- Release 额外产物：tar.gz ----
+      - name: Create tar.gz
+        if: inputs.release_mode
+        run: |
+          cd build/linux/x64/release/bundle/
+          tar -czf "../../../../../myriad-monitor-v${{ inputs.app_version }}_${{ inputs.build_number }}-linux.tar.gz" *
+
+      - uses: actions/upload-artifact@v7
+        if: inputs.release_mode
+        with:
+          name: linux-bundle
+          path: myriad-monitor-v*_*-linux.tar.gz
+
+  # ===================================================================
+  # Android
+  # ===================================================================
+  android:
+    name: Build Android
+    if: inputs.platform == 'android'
+    runs-on: ubuntu-latest
+    env:
+      APP_VERSION: ${{ inputs.app_version }}
+      APP_BUILD_NUMBER: ${{ inputs.build_number }}
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-java@v5
+        with:
+          distribution: 'zulu'
+          java-version: '17'
+
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+
+      - run: flutter create --project-name myriad_monitor --platforms android .
+
+      - run: flutter pub get
+
+      # 固定签名：从 GitHub Secrets 解码 keystore 并写入凭据文件
+      - name: Setup signing
+        run: |
+          echo "${{ secrets.ANDROID_KEYSTORE_BASE64 }}" | base64 --decode > android/app/upload-keystore.jks
+          cat <<EOF > android/key.properties
+          storePassword=${{ secrets.KEY_STORE_PASSWORD }}
+          keyPassword=${{ secrets.KEY_PASSWORD }}
+          keyAlias=${{ secrets.KEY_ALIAS }}
+          storeFile=upload-keystore.jks
+          EOF
+          sed -i '/^android\.newDsl=/d' android/gradle.properties
+
+      - run: >-
+          flutter build apk --release
+          --dart-define=APP_VERSION=${{ inputs.app_version }}
+          --dart-define=APP_BUILD_NUMBER=${{ inputs.build_number }}
+          --build-number=${{ inputs.build_number }}
+
+      - run: >-
+          flutter build apk --debug
+          --dart-define=APP_VERSION=${{ inputs.app_version }}
+          --dart-define=APP_BUILD_NUMBER=${{ inputs.build_number }}
+          --build-number=${{ inputs.build_number }}
+
+      - name: Rename APKs
+        run: |
+          if [ "${{ inputs.build_number }}" != "0" ]; then
+            PREFIX="myriad-monitor-v${{ inputs.app_version }}_${{ inputs.build_number }}"
+          else
+            PREFIX="myriad-monitor-dev"
+          fi
+          mv build/app/outputs/flutter-apk/app-release.apk "${PREFIX}-android-release.apk"
+          mv build/app/outputs/flutter-apk/app-debug.apk "${PREFIX}-android-debug.apk"
+
+      - uses: actions/upload-artifact@v7
+        with:
+          name: android-release
+          path: myriad-monitor-*-android-release.apk
+
+      - uses: actions/upload-artifact@v7
+        with:
+          name: android-debug
+          path: myriad-monitor-*-android-debug.apk
+
+  # ===================================================================
+  # iOS
+  # ===================================================================
+  ios:
+    name: Build iOS
+    if: inputs.platform == 'ios'
+    runs-on: macos-latest
+    env:
+      APP_VERSION: ${{ inputs.app_version }}
+      APP_BUILD_NUMBER: ${{ inputs.build_number }}
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+
+      - run: flutter create --project-name myriad_monitor --platforms ios .
+
+      # mobile_scanner 要求 iOS ≥15.5，Podfile 顶部插入 + Xcode 项目同步
+      - name: Bump iOS deployment target
+        run: |
+          echo 'platform :ios, "15.5"' | cat - ios/Podfile > ios/Podfile.tmp && mv ios/Podfile.tmp ios/Podfile
+          sed -i '' 's/IPHONEOS_DEPLOYMENT_TARGET = [0-9.]*/IPHONEOS_DEPLOYMENT_TARGET = 15.5/g' ios/Runner.xcodeproj/project.pbxproj
+
+      - run: flutter pub get
+
+      - run: >-
+          flutter build ios --release --no-codesign
+          --dart-define=APP_VERSION=${{ inputs.app_version }}
+          --dart-define=APP_BUILD_NUMBER=${{ inputs.build_number }}
+
+      - uses: actions/upload-artifact@v7
+        with:
+          name: ios-release
+          path: build/ios/iphoneos/
