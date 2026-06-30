@@ -140,6 +140,12 @@ class DeviceManager {
   /// 是否正在加载中（加载时跳过自动保存）
   bool _isLoading = false;
 
+  /// 持久化防抖定时器
+  Timer? _saveDebounceTimer;
+
+  /// 防抖延迟（毫秒）
+  static const int _saveDebounceMs = 500;
+
   /// 设备管理器构造函数
   DeviceManager();
 
@@ -401,7 +407,12 @@ class DeviceManager {
     }
     // 加载时跳过自动保存，避免循环
     if (!_isLoading) {
-      saveDevices();
+      // 防抖：500ms 内多次变更只触发一次持久化写入
+      _saveDebounceTimer?.cancel();
+      _saveDebounceTimer = Timer(
+        const Duration(milliseconds: _saveDebounceMs),
+        () => saveDevices(),
+      );
     }
   }
 
@@ -421,6 +432,7 @@ class DeviceManager {
   /// 应在管理器不再需要时调用，关闭所有流和定时器。
   void dispose() {
     stopOfflineDetection();
+    _saveDebounceTimer?.cancel();
     _devicesChangedController.close();
     _deviceStatusController.close();
     debugPrint('[DeviceManager] 已释放资源');

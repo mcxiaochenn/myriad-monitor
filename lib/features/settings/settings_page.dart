@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../../core/access_token.dart';
+import '../../core/constants.dart';
 import '../../core/storage/device_storage.dart';
 import '../../core/theme_provider.dart';
 import '../../l10n/app_localizations.dart';
@@ -33,7 +34,7 @@ class ServerConfigNotifier extends StateNotifier<ServerConfig> {
 
     state = ServerConfig(
       autoStart: prefs.getBool('auto_start') ?? true,
-      port: prefs.getInt('server_port') ?? 19190,
+      port: prefs.getInt('server_port') ?? NetworkConstants.defaultHttpPort,
       address: prefs.getString('listen_address') ?? '0.0.0.0',
       pushInterval: prefs.getInt('push_interval') ?? 1,
       enableDiscovery: prefs.getBool('enable_discovery') ?? true,
@@ -133,7 +134,7 @@ class ServerConfig {
 
   ServerConfig({
     this.autoStart = true,
-    this.port = 19190,
+    this.port = NetworkConstants.defaultHttpPort,
     this.address = '0.0.0.0',
     this.pushInterval = 1,
     this.enableDiscovery = true,
