@@ -61,6 +61,9 @@ jobs:
 
       - run: flutter create --project-name myriad_monitor --platforms windows .
 
+      # 防御性恢复自定义文件（flutter create 可能覆盖）
+      - run: git checkout -- windows/runner/Runner.rc windows/runner/resources/ || true
+
       - run: flutter pub get
 
       # 编译时注入版本号，实现 App UI 版本自动同步
