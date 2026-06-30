@@ -136,9 +136,6 @@ class StorageConstants {
   /// SharedPreferences 键名 - 刷新间隔
   static const String prefRefreshInterval = 'refresh_interval';
 
-  /// SharedPreferences 键名 - WebSocket 端口
-  static const String prefWebSocketPort = 'websocket_port';
-
   /// SharedPreferences 键名 - 自动启动监控
   static const String prefAutoStartMonitor = 'auto_start_monitor';
 

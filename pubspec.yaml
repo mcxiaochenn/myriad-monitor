@@ -23,7 +23,6 @@ dependencies:
 
   # HTTP 服务器框架
   shelf: ^1.4.0
-  shelf_router: ^1.1.0
 
   # 加密哈希
   crypto: ^3.0.6
@@ -50,9 +49,8 @@ dependencies:
   # URL 启动
   url_launcher: ^6.2.0
 
-  # QR 码生成与扫描
+  # QR 码生成
   qr_flutter: ^4.1.0
-  mobile_scanner: ^6.0.0
 
 dev_dependencies:
   flutter_test:
