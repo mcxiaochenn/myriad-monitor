@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../../core/constants.dart';
@@ -17,6 +19,7 @@ class AboutPage extends StatefulWidget {
 
 class _AboutPageState extends State<AboutPage> {
   int _logoTapCount = 0;
+  Timer? _resetTimer;
 
   @override
   Widget build(BuildContext context) {
@@ -40,6 +43,7 @@ class _AboutPageState extends State<AboutPage> {
                 GestureDetector(
                   onTap: () {
                     _logoTapCount++;
+                    _resetTimer?.cancel();
                     if (_logoTapCount >= 15) {
                       _logoTapCount = 0;
                       Navigator.of(context).push(
@@ -47,7 +51,7 @@ class _AboutPageState extends State<AboutPage> {
                       );
                     }
                     // 5 秒无连击则重置
-                    Future.delayed(const Duration(seconds: 5), () {
+                    _resetTimer = Timer(const Duration(seconds: 5), () {
                       if (mounted) _logoTapCount = 0;
                     });
                   },
@@ -323,9 +327,8 @@ class _AboutPageState extends State<AboutPage> {
 
   /// 打开 URL
   Future<void> _launchUrl(String url) async {
-    final uri = Uri.parse(url);
-    if (await canLaunchUrl(uri)) {
-      await launchUrl(uri);
-    }
+    try {
+      await launchUrl(Uri.parse(url));
+    } catch (_) {}
   }
 }
