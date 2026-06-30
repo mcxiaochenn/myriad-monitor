@@ -10,6 +10,7 @@ import '../../core/discovery/udp_discovery.dart';
 import '../../core/discovery/discovery_integration.dart';
 import '../../l10n/app_localizations.dart';
 import '../settings/settings_page.dart';
+import '../server/server_page.dart';
 import '../detail/detail_page.dart';
 import 'device_card.dart';
 import 'scan_page.dart';
@@ -25,7 +26,8 @@ final deviceManagerProvider = Provider<DeviceManager>((ref) {
 final discoveryIntegrationProvider = Provider<DiscoveryIntegration>((ref) {
   final deviceManager = ref.read(deviceManagerProvider);
   final config = ref.read(serverConfigProvider);
-  final discoveryService = UdpDiscoveryService(deviceName: config.deviceName, servicePort: config.port);
+  final deviceId = ref.read(deviceIdProvider).value ?? '';
+  final discoveryService = UdpDiscoveryService(deviceId: deviceId, deviceName: config.deviceName, servicePort: config.port);
   final integration = DiscoveryIntegration(discoveryService: discoveryService, deviceManager: deviceManager);
   integration.start();
   ref.onDispose(() { discoveryService.dispose(); integration.dispose(); });

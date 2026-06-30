@@ -17,8 +17,6 @@ import 'dart:convert';
 import 'dart:io';
 
 import 'package:flutter/foundation.dart';
-import 'package:shared_preferences/shared_preferences.dart';
-import 'package:uuid/uuid.dart';
 
 import 'discovery_message.dart';
 import 'discovery_service.dart';
@@ -48,8 +46,8 @@ class UdpDiscoveryService implements DiscoveryService {
   /// 离线检测定时检查间隔（毫秒）
   static const int _offlineCheckIntervalMs = 10000;
 
-  /// 本机设备唯一标识符（持久化存储）
-  late final String _deviceId;
+  /// 本机设备唯一标识符（由外部统一提供）
+  final String _deviceId;
 
   /// 本机设备显示名称
   final String deviceName;
@@ -89,16 +87,10 @@ class UdpDiscoveryService implements DiscoveryService {
   /// [deviceName] 本机设备名称，用于在局域网中标识本设备
   /// [servicePort] 本机服务端口号，其他设备连接时使用
   UdpDiscoveryService({
+    required String deviceId,
     required this.deviceName,
     required this.servicePort,
-  });
-
-  /// 初始化设备 ID（从持久化存储加载或生成新的）
-  Future<void> _initDeviceId() async {
-    final prefs = await SharedPreferences.getInstance();
-    _deviceId = prefs.getString('device_id') ?? const Uuid().v4();
-    await prefs.setString('device_id', _deviceId);
-  }
+  }) : _deviceId = deviceId;
 
   /// 本机设备 ID
   String get deviceId => _deviceId;
@@ -116,9 +108,6 @@ class UdpDiscoveryService implements DiscoveryService {
     _isRunning = true;
 
     try {
-      // 初始化设备 ID
-      await _initDeviceId();
-
       // 绑定到多播端口，允许端口复用
       _socket = await RawDatagramSocket.bind(
         InternetAddress.anyIPv4,
