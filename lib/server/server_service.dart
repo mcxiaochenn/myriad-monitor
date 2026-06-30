@@ -30,6 +30,10 @@ const _jsonHeaders = {
 /// - GET /health → 健康检查
 ///
 /// 客户端通过 HTTP GET 轮询拉取数据，替代原先的 WebSocket 推送。
+///
+/// **安全说明**：本服务使用 HTTP 明文传输，仅适用于可信局域网环境。
+/// 请勿在公网或不可信网络中使用。令牌通过 URL 路径传输，
+/// 可能被网络监控工具记录。未来的版本可能会增加 HTTPS 支持。
 class ServerService {
   /// 服务器监听端口
   final int port;

@@ -21,36 +21,6 @@ class NetworkConstants {
   NetworkConstants._();
 }
 
-/// 数据刷新相关常量
-class RefreshConstants {
-  /// 系统指标默认刷新间隔（毫秒）
-  static const int defaultRefreshIntervalMs = 1000;
-
-  /// CPU 使用率刷新间隔（毫秒）
-  static const int cpuRefreshIntervalMs = 1000;
-
-  /// 内存使用率刷新间隔（毫秒）
-  static const int memoryRefreshIntervalMs = 1000;
-
-  /// 磁盘使用率刷新间隔（毫秒）
-  static const int diskRefreshIntervalMs = 5000;
-
-  /// 网络流量刷新间隔（毫秒）
-  static const int networkRefreshIntervalMs = 1000;
-
-  /// GPU 使用率刷新间隔（毫秒）
-  static const int gpuRefreshIntervalMs = 1000;
-
-  /// 进程列表刷新间隔（毫秒）
-  static const int processRefreshIntervalMs = 2000;
-
-  /// 历史数据点数量上限
-  static const int maxHistoryDataPoints = 60;
-
-  /// 禁止实例化
-  RefreshConstants._();
-}
-
 /// 应用配置常量
 class AppConfigConstants {
   /// 应用名称

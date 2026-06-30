@@ -30,6 +30,9 @@ Future<void> main() async {
       child: MyApp(),
     ),
   );
+
+  // 应用退出时关闭日志 sink
+  await AppLogger().dispose();
 }
 
 /// 当前页面索引 Provider
