@@ -3,6 +3,7 @@ import 'dart:io';
 import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:uuid/uuid.dart';
 import '../../client/device_manager.dart';
 import '../../core/discovery/discovery_message.dart';
 import '../../core/discovery/udp_discovery.dart';
@@ -193,9 +194,9 @@ class _AddDeviceDialogState extends State<_AddDeviceDialog> {
   Future<void> _verify() async {
     if (!_fk.currentState!.validate()) return;
     setState(() { _vfy = true; _vr = null; });
+    final ip = _ip.text; final port = int.parse(_port.text); final tok = _tok.text;
+    final client = HttpClient(); client.connectionTimeout = const Duration(seconds: 5);
     try {
-      final ip = _ip.text; final port = int.parse(_port.text); final tok = _tok.text;
-      final client = HttpClient(); client.connectionTimeout = const Duration(seconds: 5);
       final req = await client.getUrl(Uri.parse('http://$ip:$port/health'));
       final resp = await req.close().timeout(const Duration(seconds: 5));
       if (resp.statusCode == 200) {
@@ -205,8 +206,8 @@ class _AddDeviceDialogState extends State<_AddDeviceDialog> {
           setState(() { _vr = resp2.statusCode == 200 ? '✅ 设备在线，令牌有效' : resp2.statusCode == 403 ? '⚠️ 设备在线但令牌无效' : '✅ 设备在线（状态码 ${resp2.statusCode}）'; _vfy = false; });
         } else { setState(() { _vr = '⚠️ 设备在线但未填写令牌（将无法获取数据）'; _vfy = false; }); }
       } else { setState(() { _vr = '❌ 设备无响应（${resp.statusCode}）'; _vfy = false; }); }
-      client.close();
     } catch (e) { setState(() { _vr = '❌ 无法连接: $e'; _vfy = false; }); }
+    finally { client.close(); }
   }
 
   @override
@@ -228,7 +229,7 @@ class _AddDeviceDialogState extends State<_AddDeviceDialog> {
       TextButton(onPressed: () => Navigator.pop(ctx), child: Text(widget.l10n.cancel)),
       FilledButton(onPressed: () {
         if (_fk.currentState!.validate()) {
-          widget.onAdd(ManagedDevice(deviceId: DateTime.now().millisecondsSinceEpoch.toString(), name: _n.text, ipAddress: _ip.text, port: int.parse(_port.text), accessToken: _tok.text, onlineStatus: DeviceOnlineStatus.unknown, discoveredAt: DateTime.now()));
+          widget.onAdd(ManagedDevice(deviceId: const Uuid().v4(), name: _n.text, ipAddress: _ip.text, port: int.parse(_port.text), accessToken: _tok.text, onlineStatus: DeviceOnlineStatus.unknown, discoveredAt: DateTime.now()));
           Navigator.pop(ctx);
         }
       }, child: Text(widget.l10n.add)),
