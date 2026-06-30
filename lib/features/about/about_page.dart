@@ -112,7 +112,11 @@ class _AboutPageState extends State<AboutPage> {
             leading: Icon(Icons.description, color: colorScheme.primary),
             title: Text(l10n.openSourceLicense),
             trailing: const Icon(Icons.chevron_right),
-            onTap: () => _showLicenseDialog(context, l10n),
+            onTap: () => showLicensePage(
+              context: context,
+              applicationName: l10n.appName,
+              applicationVersion: 'v${AppConfigConstants.appVersion}',
+            ),
           ),
 
           const Divider(),
@@ -285,43 +289,6 @@ class _AboutPageState extends State<AboutPage> {
       subtitle: Text(description),
       trailing: const Icon(Icons.open_in_new, size: 16),
       onTap: () => _launchUrl(url),
-    );
-  }
-
-  /// 显示许可证对话框
-  void _showLicenseDialog(BuildContext context, AppLocalizations l10n) {
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: Text(l10n.openSourceLicense),
-        content: const SingleChildScrollView(
-          child: Text(
-            'MIT License\n\n'
-            'Copyright (c) 2026 辰渊尘\n\n'
-            'Permission is hereby granted, free of charge, to any person obtaining a copy '
-            'of this software and associated documentation files (the "Software"), to deal '
-            'in the Software without restriction, including without limitation the rights '
-            'to use, copy, modify, merge, publish, distribute, sublicense, and/or sell '
-            'copies of the Software, and to permit persons to whom the Software is '
-            'furnished to do so, subject to the following conditions:\n\n'
-            'The above copyright notice and this permission notice shall be included in all '
-            'copies or substantial portions of the Software.\n\n'
-            'THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR '
-            'IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, '
-            'FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE '
-            'AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER '
-            'LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, '
-            'OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE '
-            'SOFTWARE.',
-          ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: Text(l10n.close),
-          ),
-        ],
-      ),
     );
   }
 
