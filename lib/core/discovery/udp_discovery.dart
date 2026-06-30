@@ -20,7 +20,6 @@ import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:uuid/uuid.dart';
 
-import '../access_token.dart';
 import 'discovery_message.dart';
 import 'discovery_service.dart';
 
@@ -219,7 +218,6 @@ class UdpDiscoveryService implements DiscoveryService {
   /// 构建公告/心跳消息
   Future<DiscoveryMessage> _buildMessage(String type) async {
     final localIp = await _getLocalIp();
-    final token = await loadAccessToken();
     return DiscoveryMessage(
       type: type,
       deviceId: _deviceId,
@@ -227,7 +225,6 @@ class UdpDiscoveryService implements DiscoveryService {
       ip: localIp,
       port: servicePort,
       os: _getOsName(),
-      accessToken: token,
       timestamp: DateTime.now().millisecondsSinceEpoch,
     );
   }
@@ -332,7 +329,6 @@ class UdpDiscoveryService implements DiscoveryService {
         ip: '',
         port: 0,
         os: '',
-        accessToken: '',
         timestamp: now,
       ));
       debugPrint('[Discovery] 设备离线: $deviceId');

@@ -36,6 +36,11 @@ class ServerStatusNotifier extends StateNotifier<ServerStatus> {
   ServerStatusNotifier() : super(ServerStatus());
   ServerService? get service => _service;
 
+  /// 刷新 Server 端的访问令牌（设置页面重置令牌后调用）
+  Future<void> refreshAccessToken() async {
+    await _service?.refreshAccessToken();
+  }
+
   Future<void> toggleService(WidgetRef ref) async {
     if (state.isRunning) {
       AppLogger().info('正在停止 HTTP 服务...');

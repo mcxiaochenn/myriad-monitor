@@ -86,13 +86,13 @@ class DiscoveryIntegration {
     final existingDevice = _deviceManager.getDevice(message.deviceId);
 
     if (existingDevice == null) {
-      // 添加新设备
+      // 添加新设备（token 通过 QR 码/手动输入等带外方式获取，不在多播中传输）
       final newDevice = ManagedDevice(
         deviceId: message.deviceId,
         name: message.deviceName,
         ipAddress: message.ip,
         port: message.port,
-        accessToken: message.accessToken,
+        accessToken: '',
         onlineStatus: DeviceOnlineStatus.online,
         discoveredAt: DateTime.now(),
         lastSeenAt: DateTime.now(),

@@ -261,7 +261,7 @@ class _DiscoveredDevicesDialogState extends State<_DiscoveredDevicesDialog> {
       final d = _list[i]; final added = _added(d.deviceId);
       return ListTile(leading: Icon(Icons.devices, color: Theme.of(ctx).colorScheme.primary), title: Text(d.deviceName), subtitle: Text('${d.ip}:${d.port}'),
         trailing: added ? Chip(label: Text(widget.l10n.added), backgroundColor: Theme.of(ctx).colorScheme.surfaceContainerHighest) : FilledButton(onPressed: () {
-          widget.onAdd(ManagedDevice(deviceId: d.deviceId, name: d.deviceName, ipAddress: d.ip, port: d.port, accessToken: d.accessToken, onlineStatus: DeviceOnlineStatus.online, discoveredAt: DateTime.now(), lastSeenAt: DateTime.now()));
+          widget.onAdd(ManagedDevice(deviceId: d.deviceId, name: d.deviceName, ipAddress: d.ip, port: d.port, accessToken: '', onlineStatus: DeviceOnlineStatus.online, discoveredAt: DateTime.now(), lastSeenAt: DateTime.now()));
           Navigator.pop(ctx);
         }, child: Text(widget.l10n.add)));
     })),

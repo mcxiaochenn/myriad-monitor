@@ -69,6 +69,14 @@ class ServerService {
   /// 服务器是否正在运行
   bool get isRunning => _isRunning;
 
+  /// 刷新访问令牌
+  ///
+  /// 当用户在设置页面重置令牌后调用，使正在运行的 Server 同步更新。
+  Future<void> refreshAccessToken() async {
+    _expectedToken = await loadAccessToken();
+    debugPrint('[ServerService] 访问令牌已刷新');
+  }
+
   /// 启动 HTTP 服务器
   ///
   /// [deviceId] 本机设备唯一标识

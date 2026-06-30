@@ -24,7 +24,8 @@ class DiscoveryMessageType {
 /// 设备发现消息
 ///
 /// 用于设备之间的 UDP 多播通信，包含设备的基本信息和消息类型。
-/// 所有设备通过多播地址 `239.255.255.250:1900` 互相发现。
+/// 所有设备通过多播地址 `224.0.0.0:53317` 互相发现。
+/// 注意：access_token 不通过多播传输，由 QR 码/手动输入等带外方式交换。
 class DiscoveryMessage {
   /// 消息类型：announce / heartbeat / heartbeat_ack
   final String type;
@@ -44,9 +45,6 @@ class DiscoveryMessage {
   /// 操作系统标识（如 windows、macos、linux）
   final String os;
 
-  /// HTTP API 访问令牌（SHA256 哈希，64 位 HEX）
-  final String accessToken;
-
   /// 消息发送时的 Unix 时间戳（毫秒）
   final int timestamp;
 
@@ -58,7 +56,6 @@ class DiscoveryMessage {
     required this.ip,
     required this.port,
     required this.os,
-    required this.accessToken,
     required this.timestamp,
   });
 
@@ -74,7 +71,6 @@ class DiscoveryMessage {
       ip: json['ip'] as String? ?? '',
       port: json['port'] as int? ?? 0,
       os: json['os'] as String? ?? '',
-      accessToken: json['access_token'] as String? ?? '',
       timestamp: json['timestamp'] as int? ?? 0,
     );
   }
@@ -90,7 +86,6 @@ class DiscoveryMessage {
       'ip': ip,
       'port': port,
       'os': os,
-      'access_token': accessToken,
       'timestamp': timestamp,
     };
   }
@@ -123,7 +118,6 @@ class DiscoveryMessage {
       ip: ip,
       port: port,
       os: os,
-      accessToken: accessToken,
       timestamp: DateTime.now().millisecondsSinceEpoch,
     );
   }

@@ -6,6 +6,7 @@ import '../../core/storage/device_storage.dart';
 import '../../core/theme_provider.dart';
 import '../../l10n/app_localizations.dart';
 import '../../l10n/locale_provider.dart';
+import '../server/server_page.dart';
 
 /// 服务器配置 Provider（异步加载）
 final serverConfigProvider =
@@ -659,6 +660,8 @@ class SettingsPage extends ConsumerWidget {
               await resetAccessToken();
               // 刷新 Provider 以获取新令牌
               ref.invalidate(accessTokenProvider);
+              // 同步刷新正在运行的 Server 端令牌
+              ref.read(serverStatusProvider.notifier).refreshAccessToken();
               if (context.mounted) {
                 ScaffoldMessenger.of(context).showSnackBar(
                   SnackBar(
