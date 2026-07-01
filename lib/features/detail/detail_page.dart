@@ -49,7 +49,7 @@ class _DeviceDetailPageState extends State<DeviceDetailPage> {
     if (url.isEmpty) {
       setState(() {
         _connectionStatus = ConnectionStatus.error;
-        _errorMessage = '设备连接信息不完整（缺少 IP/端口/令牌）';
+        _errorMessage = AppLocalizations.of(context).deviceInfoIncomplete;
       });
       return;
     }
@@ -132,17 +132,17 @@ class _DeviceDetailPageState extends State<DeviceDetailPage> {
   Widget _buildBody(ThemeData theme, AppLocalizations l10n,
       List<double> cpu, List<double> up, List<double> down) {
     if (_connectionStatus == ConnectionStatus.connecting && _latestData == null) {
-      return const Center(child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
-        CircularProgressIndicator(), SizedBox(height: 16), Text('正在连接设备...'),
+      return Center(child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
+        const CircularProgressIndicator(), const SizedBox(height: 16), Text(l10n.connectingDevice),
       ]));
     }
     if (_connectionStatus == ConnectionStatus.error && _latestData == null) {
       return Center(child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
         const Icon(Icons.error_outline, size: 64, color: Colors.red),
         const SizedBox(height: 16),
-        Text(_errorMessage ?? '连接失败', style: theme.textTheme.titleMedium),
+        Text(_errorMessage ?? l10n.connectionFailed, style: theme.textTheme.titleMedium),
         const SizedBox(height: 16),
-        ElevatedButton(onPressed: () { setState(() { _connectionStatus = ConnectionStatus.connecting; _errorMessage = null; }); _connect(); }, child: const Text('重试')),
+        ElevatedButton(onPressed: () { setState(() { _connectionStatus = ConnectionStatus.connecting; _errorMessage = null; }); _connect(); }, child: Text(l10n.retry)),
       ]));
     }
 
@@ -232,7 +232,7 @@ class _DeviceDetailPageState extends State<DeviceDetailPage> {
             const SizedBox(height: 6),
             ClipRRect(borderRadius: BorderRadius.circular(6), child: LinearProgressIndicator(value: u, minHeight: 8, backgroundColor: t.colorScheme.surfaceContainerHighest, valueColor: AlwaysStoppedAnimation(u > 0.9 ? Colors.red : Colors.blue))),
             const SizedBox(height: 4),
-            Text('已用 ${_formatBytes(disk.usedSpace)} / 共 ${_formatBytes(disk.totalSpace)}', style: t.textTheme.bodySmall?.copyWith(color: t.colorScheme.onSurfaceVariant)),
+            Text(l.usedOf(_formatBytes(disk.usedSpace), _formatBytes(disk.totalSpace)), style: t.textTheme.bodySmall?.copyWith(color: t.colorScheme.onSurfaceVariant)),
           ]));
         }),
       ])),
