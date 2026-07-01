@@ -408,9 +408,7 @@ class AppLocalizations {
   String get linkFormatIncorrect => locale.languageCode == 'zh' ? '链接格式不正确（缺少设备ID和令牌）' : 'Incorrect link format (missing device ID and token)';
   String get deviceConnected => locale.languageCode == 'zh' ? '设备已连接' : 'Device connected';
   String get tokenInvalid => locale.languageCode == 'zh' ? '令牌无效（403），请联系设备管理员' : 'Token invalid (403), contact device admin';
-  String get verifying => locale.languageCode == 'zh' ? '验证中...' : 'Verifying...';
   String get deviceInfoPreview => locale.languageCode == 'zh' ? '设备信息' : 'Device Info';
-  String get deviceNameLabel => locale.languageCode == 'zh' ? '设备名称' : 'Device Name';
 }
 
 /// 本地化代理
