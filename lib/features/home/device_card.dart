@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../../client/device_manager.dart';
+import '../../l10n/app_localizations.dart';
 
 /// 设备卡片组件
 ///
@@ -54,9 +55,9 @@ class DeviceCard extends StatelessWidget {
                 _buildDeviceIcon(colorScheme),
                 const SizedBox(width: 16),
                 // 中间：设备信息
-                Expanded(child: _buildDeviceInfo(theme)),
+                Expanded(child: _buildDeviceInfo(context, theme)),
                 // 右侧：状态指示灯
-                _buildStatusIndicator(),
+                _buildStatusIndicator(context),
               ],
             ),
           ),
@@ -101,7 +102,7 @@ class DeviceCard extends StatelessWidget {
   }
 
   /// 构建设备信息区域（名称、IP、最后在线时间）
-  Widget _buildDeviceInfo(ThemeData theme) {
+  Widget _buildDeviceInfo(BuildContext context, ThemeData theme) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       mainAxisSize: MainAxisSize.min,
@@ -130,7 +131,7 @@ class DeviceCard extends StatelessWidget {
         // 最后在线时间
         if (device.lastSeenAt != null)
           Text(
-            '最后在线: ${_formatLastSeen(device.lastSeenAt!)}',
+            AppLocalizations.of(context).lastSeenTime(_formatLastSeen(context, device.lastSeenAt!)),
             style: theme.textTheme.bodySmall?.copyWith(
               color: theme.colorScheme.onSurfaceVariant.withValues(alpha: 0.7),
             ),
@@ -142,25 +143,26 @@ class DeviceCard extends StatelessWidget {
   }
 
   /// 格式化最后在线时间
-  String _formatLastSeen(DateTime lastSeen) {
+  String _formatLastSeen(BuildContext context, DateTime lastSeen) {
     final now = DateTime.now();
     final diff = now.difference(lastSeen);
+    final l10n = AppLocalizations.of(context);
 
     if (diff.inSeconds < 60) {
-      return '${diff.inSeconds}秒前';
+      return l10n.secondsAgo(diff.inSeconds);
     } else if (diff.inMinutes < 60) {
-      return '${diff.inMinutes}分钟前';
+      return l10n.minutesAgo(diff.inMinutes);
     } else if (diff.inHours < 24) {
-      return '${diff.inHours}小时前';
+      return l10n.hoursAgo(diff.inHours);
     } else {
-      return '${diff.inDays}天前';
+      return l10n.daysAgo(diff.inDays);
     }
   }
 
   /// 构建状态指示灯
   ///
   /// 在线时显示绿色脉冲圆点，离线时显示灰色圆点。
-  Widget _buildStatusIndicator() {
+  Widget _buildStatusIndicator(BuildContext context) {
     final isOnline = device.isOnline;
     final dotColor = isOnline ? Colors.greenAccent : Colors.grey;
 
@@ -190,7 +192,7 @@ class DeviceCard extends StatelessWidget {
         const SizedBox(height: 4),
         // 状态文字
         Text(
-          isOnline ? '在线' : '离线',
+          isOnline ? AppLocalizations.of(context).online : AppLocalizations.of(context).offline,
           style: TextStyle(
             fontSize: 11,
             color: dotColor,

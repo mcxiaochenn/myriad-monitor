@@ -364,6 +364,53 @@ class AppLocalizations {
   String get serverLog => locale.languageCode == 'zh' ? '服务端日志' : 'Server Log';
   String get noLogs => locale.languageCode == 'zh' ? '暂无日志' : 'No logs';
   String get clearLogs => locale.languageCode == 'zh' ? '清除' : 'Clear';
+
+  // ==================== 设备类型 ====================
+  String get deviceTypeServer => locale.languageCode == 'zh' ? '服务器' : 'Server';
+  String get deviceTypeLaptop => locale.languageCode == 'zh' ? '笔记本' : 'Laptop';
+  String get deviceTypeDesktop => locale.languageCode == 'zh' ? '台式机' : 'Desktop';
+  String get deviceTypePhone => locale.languageCode == 'zh' ? '手机' : 'Phone';
+  String get deviceTypeTablet => locale.languageCode == 'zh' ? '平板' : 'Tablet';
+
+  // ==================== 开发者页面 ====================
+  String get devAppLog => locale.languageCode == 'zh' ? '应用日志' : 'App Log';
+  String get devAppInfo => locale.languageCode == 'zh' ? '应用信息' : 'App Info';
+  String get devVersion => locale.languageCode == 'zh' ? '版本' : 'Version';
+  String get devPlatform => locale.languageCode == 'zh' ? '平台' : 'Platform';
+  String get devLogDir => locale.languageCode == 'zh' ? '日志目录' : 'Log Dir';
+  String get devLogDirUninit => locale.languageCode == 'zh' ? '未初始化' : 'Not initialized';
+  String get devActions => locale.languageCode == 'zh' ? '操作' : 'Actions';
+  String get devCopyAllLogs => locale.languageCode == 'zh' ? '复制全部日志' : 'Copy All Logs';
+  String get devLogsCopied => locale.languageCode == 'zh' ? '日志已复制' : 'Logs copied';
+
+  // ==================== 服务端日志 ====================
+  String get serverStopping => locale.languageCode == 'zh' ? '正在停止 HTTP 服务...' : 'Stopping HTTP service...';
+  String get serverStopped => locale.languageCode == 'zh' ? 'HTTP 服务已停止' : 'HTTP service stopped';
+  String get serverStarting => locale.languageCode == 'zh' ? '正在启动 HTTP 服务...' : 'Starting HTTP service...';
+  String get serverStartFailed => locale.languageCode == 'zh' ? 'HTTP 服务启动失败' : 'HTTP service start failed';
+  String get serverStarted => locale.languageCode == 'zh' ? 'HTTP 服务已启动' : 'HTTP service started';
+  String get serverStartError => locale.languageCode == 'zh' ? '服务启动异常' : 'Service start error';
+  String get deviceIdNotReady => locale.languageCode == 'zh' ? '设备 ID 未就绪' : 'Device ID not ready';
+
+  // ==================== 绑定二维码 ====================
+  String get bindQrTitle => locale.languageCode == 'zh' ? '绑定二维码' : 'Bind QR Code';
+
+  // ==================== 设备详情页 ====================
+  String get connectingDevice => locale.languageCode == 'zh' ? '正在连接设备...' : 'Connecting...';
+  String get connectionFailed => locale.languageCode == 'zh' ? '连接失败' : 'Connection failed';
+  String get retry => locale.languageCode == 'zh' ? '重试' : 'Retry';
+  String get deviceInfoIncomplete => locale.languageCode == 'zh' ? '设备连接信息不完整（缺少 IP/端口/令牌）' : 'Incomplete device info (missing IP/port/token)';
+  String usedOf(String used, String total) =>
+      locale.languageCode == 'zh' ? '已用 $used / 共 $total' : 'Used $used / Total $total';
+
+  // ==================== 扫描验证 ====================
+  String get invalidLinkFormat => locale.languageCode == 'zh' ? '无效的链接格式' : 'Invalid link format';
+  String get linkFormatIncorrect => locale.languageCode == 'zh' ? '链接格式不正确（缺少设备ID和令牌）' : 'Incorrect link format (missing device ID and token)';
+  String get deviceConnected => locale.languageCode == 'zh' ? '设备已连接' : 'Device connected';
+  String get tokenInvalid => locale.languageCode == 'zh' ? '令牌无效（403），请联系设备管理员' : 'Token invalid (403), contact device admin';
+  String get verifying => locale.languageCode == 'zh' ? '验证中...' : 'Verifying...';
+  String get deviceInfoPreview => locale.languageCode == 'zh' ? '设备信息' : 'Device Info';
+  String get deviceNameLabel => locale.languageCode == 'zh' ? '设备名称' : 'Device Name';
 }
 
 /// 本地化代理
