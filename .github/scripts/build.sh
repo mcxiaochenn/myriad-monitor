@@ -64,7 +64,7 @@ DART_DEFINES="--dart-define=APP_VERSION=${APP_VERSION:-dev} --dart-define=APP_BU
 
 case "$PLATFORM" in
   windows)
-    eval flutter build windows --release "$DART_DEFINES"
+    eval flutter build windows --release --verbose "$DART_DEFINES" 2>&1 | tail -100
     ;;
   macos)
     eval flutter build macos --release "$DART_DEFINES"
