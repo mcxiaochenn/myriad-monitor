@@ -9,9 +9,7 @@ on:
 
 jobs:
   # ===================================================================
-  # 版本解析：读取版本名 + 计算版本码
-  # 版本码 = 10001 + git rev-list --count HEAD（总提交数，幂等）
-  # PR 时跳过（CI 验证不需要消耗版本码）
+  # 版本解析
   # ===================================================================
   version:
     name: Resolve Version
@@ -31,17 +29,15 @@ jobs:
           VER=$(grep '^version:' pubspec.yaml | sed 's/version: *//')
           VERSION_NAME="${VER%+*}"
           echo "version_name=$VERSION_NAME" >> $GITHUB_OUTPUT
-          echo "pubspec.yaml → version=$VERSION_NAME"
 
       - name: Compute version code from git history
         id: code
         run: |
           CODE=$((10001 + $(git rev-list --count HEAD)))
           echo "version_code=$CODE" >> $GITHUB_OUTPUT
-          echo "git rev-list --count HEAD → version_code=$CODE"
 
   # ===================================================================
-  # 全平台构建（调用可复用工作流）
+  # 全平台构建（纯构建，不含打包）
   # ===================================================================
   build-windows:
     name: Build Windows
@@ -99,40 +95,140 @@ jobs:
     secrets: inherit
 
   # ===================================================================
+  # 打包（build 模式：简单打包）
+  # ===================================================================
+  package-windows:
+    name: Package Windows
+    needs: [version, build-windows]
+    if: always() && needs.build-windows.result == 'success'
+    runs-on: ubuntu-latest
+    env:
+      VER: ${{ needs.version.outputs.version_name || 'dev' }}
+      CODE: ${{ needs.version.outputs.version_code || '0' }}
+    steps:
+      - uses: actions/download-artifact@v7
+        with:
+          name: windows-build
+          path: windows-build/
+
+      - name: Create ZIP
+        run: |
+          SUFFIX=$([[ "$CODE" != "0" ]] && echo "v${VER}_${CODE}" || echo "dev")
+          cd windows-build && zip -r "../myriad-monitor-${SUFFIX}-windows.zip" .
+
+      - uses: actions/upload-artifact@v7
+        with:
+          name: windows-release
+          path: myriad-monitor-*-windows.zip
+
+  package-macos:
+    name: Package macOS
+    needs: [version, build-macos]
+    if: always() && needs.build-macos.result == 'success'
+    runs-on: ubuntu-latest
+    env:
+      VER: ${{ needs.version.outputs.version_name || 'dev' }}
+      CODE: ${{ needs.version.outputs.version_code || '0' }}
+    steps:
+      - uses: actions/download-artifact@v7
+        with:
+          name: macos-build
+          path: macos-build/
+
+      - name: Create ZIP
+        run: |
+          SUFFIX=$([[ "$CODE" != "0" ]] && echo "v${VER}_${CODE}" || echo "dev")
+          cd macos-build && zip -r "../myriad-monitor-${SUFFIX}-macos.zip" .
+
+      - uses: actions/upload-artifact@v7
+        with:
+          name: macos-release
+          path: myriad-monitor-*-macos.zip
+
+  package-linux:
+    name: Package Linux
+    needs: [version, build-linux]
+    if: always() && needs.build-linux.result == 'success'
+    runs-on: ubuntu-latest
+    env:
+      VER: ${{ needs.version.outputs.version_name || 'dev' }}
+      CODE: ${{ needs.version.outputs.version_code || '0' }}
+    steps:
+      - uses: actions/download-artifact@v7
+        with:
+          name: linux-build
+          path: linux-build/
+
+      - name: Create tar.gz
+        run: |
+          SUFFIX=$([[ "$CODE" != "0" ]] && echo "v${VER}_${CODE}" || echo "dev")
+          cd linux-build && tar -czf "../myriad-monitor-${SUFFIX}-linux.tar.gz" .
+
+      - uses: actions/upload-artifact@v7
+        with:
+          name: linux-release
+          path: myriad-monitor-*-linux.tar.gz
+
+  package-android:
+    name: Package Android
+    needs: [version, build-android]
+    if: always() && needs.build-android.result == 'success'
+    runs-on: ubuntu-latest
+    env:
+      VER: ${{ needs.version.outputs.version_name || 'dev' }}
+      CODE: ${{ needs.version.outputs.version_code || '0' }}
+    steps:
+      - uses: actions/download-artifact@v7
+        with:
+          name: android-build-release
+
+      - uses: actions/download-artifact@v7
+        with:
+          name: android-build-debug
+
+      - name: Rename APKs
+        run: |
+          SUFFIX=$([[ "$CODE" != "0" ]] && echo "v${VER}_${CODE}" || echo "dev")
+          mv app-release.apk "myriad-monitor-${SUFFIX}-android-release.apk"
+          mv app-debug.apk "myriad-monitor-${SUFFIX}-android-debug.apk"
+
+      - uses: actions/upload-artifact@v7
+        with:
+          name: android-release
+          path: myriad-monitor-*-android-release.apk
+
+      - uses: actions/upload-artifact@v7
+        with:
+          name: android-debug
+          path: myriad-monitor-*-android-debug.apk
+
+  # ===================================================================
   # WAA 打包：Windows + Android Release 产物合并下载
   # ===================================================================
   bundle-waa:
     name: Bundle WAA (Windows + Android)
-    needs: [version, build-windows, build-android]
+    needs: [version, package-windows, package-android]
     if: |
       always() &&
-      (needs.version.result == 'success' || needs.version.result == 'skipped') &&
-      needs.build-windows.result == 'success' &&
-      needs.build-android.result == 'success'
+      needs.package-windows.result == 'success' &&
+      needs.package-android.result == 'success'
     runs-on: ubuntu-latest
     env:
-      APP_VERSION: ${{ needs.version.outputs.version_name || 'dev' }}
-      APP_BUILD_NUMBER: ${{ needs.version.outputs.version_code || '0' }}
+      VER: ${{ needs.version.outputs.version_name || 'dev' }}
+      CODE: ${{ needs.version.outputs.version_code || '0' }}
     steps:
-      - name: Download Windows artifact
-        uses: actions/download-artifact@v7
+      - uses: actions/download-artifact@v7
         with:
-          name: windows-portable
+          name: windows-release
 
-      - name: Download Android release artifact
-        uses: actions/download-artifact@v7
+      - uses: actions/download-artifact@v7
         with:
           name: android-release
 
       - name: Create WAA combined package
         run: |
-          if [ "$APP_BUILD_NUMBER" != "0" ]; then
-            NAME="waa(windows and android)-release-v${APP_VERSION}_${APP_BUILD_NUMBER}"
-          else
-            NAME="waa(windows and android)-dev"
-          fi
-          zip -r "${NAME}.zip" .
-          echo "Created: ${NAME}.zip"
+          SUFFIX=$([[ "$CODE" != "0" ]] && echo "v${VER}_${CODE}" || echo "dev")
+          zip -r "waa(windows and android)-release-${SUFFIX}.zip" .
 
       - uses: actions/upload-artifact@v7
         with:

@@ -7,7 +7,9 @@ on:
   workflow_dispatch:
 
 jobs:
-  # 版本解析：版本名来自 pubspec.yaml + 版本码从 git 历史自动计算
+  # ===================================================================
+  # 版本解析
+  # ===================================================================
   resolve:
     name: Resolve Version
     runs-on: ubuntu-latest
@@ -26,29 +28,25 @@ jobs:
           VER=$(grep '^version:' pubspec.yaml | sed 's/version: *//')
           VERSION_NAME="${VER%+*}"
           echo "version_name=$VERSION_NAME" >> $GITHUB_OUTPUT
-          echo "pubspec.yaml → version=$VERSION_NAME"
 
       - name: Compute version code from git history
         id: code
         run: |
           CODE=$((10001 + $(git rev-list --count HEAD)))
           echo "version_code=$CODE" >> $GITHUB_OUTPUT
-          echo "git rev-list --count HEAD → version_code=$CODE"
 
       - name: Resolve release tag
         id: tag
         run: |
-          # tag push → 用 git ref；手动触发 → 从 pubspec.yaml 自动生成
           if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
             TAG="v${{ steps.name.outputs.version_name }}"
           else
             TAG="${{ github.ref_name }}"
           fi
           echo "release_tag=$TAG" >> $GITHUB_OUTPUT
-          echo "Resolved tag: $TAG (event: ${{ github.event_name }})"
 
   # ===================================================================
-  # 全平台构建（调用可复用工作流，release_mode 开启额外打包）
+  # 全平台构建（纯构建，不含打包）
   # ===================================================================
   build-windows:
     name: Build Windows
@@ -58,7 +56,6 @@ jobs:
       platform: windows
       app_version: ${{ needs.resolve.outputs.version_name }}
       build_number: ${{ needs.resolve.outputs.version_code }}
-      release_mode: true
     secrets: inherit
 
   build-macos:
@@ -69,7 +66,6 @@ jobs:
       platform: macos
       app_version: ${{ needs.resolve.outputs.version_name }}
       build_number: ${{ needs.resolve.outputs.version_code }}
-      release_mode: true
     secrets: inherit
 
   build-linux:
@@ -80,7 +76,6 @@ jobs:
       platform: linux
       app_version: ${{ needs.resolve.outputs.version_name }}
       build_number: ${{ needs.resolve.outputs.version_code }}
-      release_mode: true
     secrets: inherit
 
   build-android:
@@ -91,7 +86,6 @@ jobs:
       platform: android
       app_version: ${{ needs.resolve.outputs.version_name }}
       build_number: ${{ needs.resolve.outputs.version_code }}
-      release_mode: true
     secrets: inherit
 
   build-ios:
@@ -102,15 +96,152 @@ jobs:
       platform: ios
       app_version: ${{ needs.resolve.outputs.version_name }}
       build_number: ${{ needs.resolve.outputs.version_code }}
-      release_mode: true
     secrets: inherit
+
+  # ===================================================================
+  # 打包（release 模式：完整打包）
+  # ===================================================================
+  package-windows:
+    name: Package Windows
+    needs: [resolve, build-windows]
+    if: always() && needs.build-windows.result == 'success'
+    runs-on: windows-latest
+    env:
+      VER: ${{ needs.resolve.outputs.version_name }}
+      CODE: ${{ needs.resolve.outputs.version_code }}
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/download-artifact@v7
+        with:
+          name: windows-build
+          path: build/windows/x64/runner/Release/
+
+      - name: Create portable ZIP
+        shell: pwsh
+        run: |
+          Compress-Archive -Path build/windows/x64/runner/Release/* `
+            -DestinationPath "myriad-monitor-v${VER}_${CODE}-windows-portable.zip"
+
+      - uses: actions/upload-artifact@v7
+        with:
+          name: windows-portable
+          path: myriad-monitor-v*_*-windows-portable.zip
+
+      - name: Install Inno Setup
+        run: choco install innosetup -y
+
+      - name: Update installer version
+        run: |
+          (Get-Content windows\installer.iss) `
+            -replace 'AppVersion=.*', 'AppVersion=${{ env.VER }}' |
+          Set-Content windows\installer.iss
+
+      - name: Build installer
+        run: |
+          & "C:\Program Files (x86)\Inno Setup 6\ISCC.exe" windows\installer.iss
+
+      - name: Rename installer
+        run: |
+          $installer = Get-ChildItem build/windows/installer/*.exe | Select-Object -First 1
+          Rename-Item $installer.FullName "myriad-monitor-v${VER}_${CODE}-windows-installer.exe"
+
+      - uses: actions/upload-artifact@v7
+        with:
+          name: windows-installer
+          path: myriad-monitor-v*_*-windows-installer.exe
+          if-no-files-found: warn
+
+  package-macos:
+    name: Package macOS
+    needs: [resolve, build-macos]
+    if: always() && needs.build-macos.result == 'success'
+    runs-on: macos-latest
+    env:
+      VER: ${{ needs.resolve.outputs.version_name }}
+      CODE: ${{ needs.resolve.outputs.version_code }}
+    steps:
+      - uses: actions/download-artifact@v7
+        with:
+          name: macos-build
+          path: macos-build/
+
+      - name: Create DMG
+        run: |
+          APP_PATH=$(find macos-build -name "*.app" -type d | head -1)
+          if [ -z "$APP_PATH" ]; then
+            echo "Error: .app file not found"
+            exit 1
+          fi
+          hdiutil create -volname "Myriad Monitor" -srcfolder "$APP_PATH" -ov -format UDZO \
+            "myriad-monitor-v${VER}_${CODE}-macos.dmg"
+
+      - uses: actions/upload-artifact@v7
+        with:
+          name: macos-dmg
+          path: myriad-monitor-v*_*-macos.dmg
+
+  package-linux:
+    name: Package Linux
+    needs: [resolve, build-linux]
+    if: always() && needs.build-linux.result == 'success'
+    runs-on: ubuntu-latest
+    env:
+      VER: ${{ needs.resolve.outputs.version_name }}
+      CODE: ${{ needs.resolve.outputs.version_code }}
+    steps:
+      - uses: actions/download-artifact@v7
+        with:
+          name: linux-build
+          path: linux-build/
+
+      - name: Create tar.gz
+        run: |
+          cd linux-build && tar -czf "../myriad-monitor-v${VER}_${CODE}-linux.tar.gz" *
+
+      - uses: actions/upload-artifact@v7
+        with:
+          name: linux-bundle
+          path: myriad-monitor-v*_*-linux.tar.gz
+
+  package-android:
+    name: Package Android
+    needs: [resolve, build-android]
+    if: always() && needs.build-android.result == 'success'
+    runs-on: ubuntu-latest
+    env:
+      VER: ${{ needs.resolve.outputs.version_name }}
+      CODE: ${{ needs.resolve.outputs.version_code }}
+    steps:
+      - uses: actions/download-artifact@v7
+        with:
+          name: android-build-release
+
+      - uses: actions/download-artifact@v7
+        with:
+          name: android-build-debug
+
+      - name: Rename APKs
+        run: |
+          mv app-release.apk "myriad-monitor-v${VER}_${CODE}-android-release.apk"
+          mv app-debug.apk "myriad-monitor-v${VER}_${CODE}-android-debug.apk"
+
+      - uses: actions/upload-artifact@v7
+        with:
+          name: android-release
+          path: myriad-monitor-v*_*-android-release.apk
+
+      - uses: actions/upload-artifact@v7
+        with:
+          name: android-debug
+          path: myriad-monitor-v*_*-android-debug.apk
 
   # ===================================================================
   # 创建 GitHub Release
   # ===================================================================
   create-release:
     name: Create Release
-    needs: [resolve, build-windows, build-macos, build-linux, build-android, build-ios]
+    needs: [resolve, package-windows, package-macos, package-linux, package-android]
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -124,11 +255,8 @@ jobs:
           TAG="${{ needs.resolve.outputs.release_tag }}"
           if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
             if ! git rev-parse "$TAG" >/dev/null 2>&1; then
-              echo "Creating tag: $TAG"
               git tag "$TAG"
               git push origin "$TAG"
-            else
-              echo "Tag $TAG already exists"
             fi
           fi
 
@@ -140,7 +268,6 @@ jobs:
         run: |
           TAG="${{ needs.resolve.outputs.release_tag }}"
           PREV_TAG=$(git tag --sort=-v:refname | grep -v "^${TAG}$" | head -1 || echo "")
-          echo "prev_tag=$PREV_TAG" >> $GITHUB_OUTPUT
 
           if [ -z "$PREV_TAG" ]; then
             echo "changelog=Initial release" >> $GITHUB_OUTPUT
@@ -153,7 +280,6 @@ jobs:
             echo "full_changelog=https://github.com/$GITHUB_REPOSITORY/compare/${PREV_TAG}...${TAG}" >> $GITHUB_OUTPUT
           fi
 
-      # Release：纯 tag 标题 + What's Changed + Full Changelog
       - name: Create Release
         uses: softprops/action-gh-release@v3
         with:
