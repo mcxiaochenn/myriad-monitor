@@ -95,8 +95,8 @@ class ServerPage extends ConsumerWidget {
       body: ListView(children: [
         _infoCard(theme, l, cfg, did), const SizedBox(height: 16),
         _svcCard(context, ref, theme, l, cfg, s, did), const SizedBox(height: 16),
-        _bindCard(context, ref, theme, cfg, s, did), const SizedBox(height: 16),
-        _logCard(theme, logs, ref), const SizedBox(height: 16),
+        _bindCard(context, ref, theme, cfg, s, did, l), const SizedBox(height: 16),
+        _logCard(context, theme, logs, ref), const SizedBox(height: 16),
         _netCard(context, theme, l),
       ]),
     );
@@ -132,26 +132,26 @@ class ServerPage extends ConsumerWidget {
     ])));
   }
 
-  Widget _bindCard(BuildContext ctx, WidgetRef ref, ThemeData t, ServerConfig c, ServerStatus s, AsyncValue<String> d) {
+  Widget _bindCard(BuildContext ctx, WidgetRef ref, ThemeData t, ServerConfig c, ServerStatus s, AsyncValue<String> d, AppLocalizations l) {
     final tok = ref.watch(accessTokenProvider);
     return Card(margin: const EdgeInsets.symmetric(horizontal: 16), child: Padding(padding: const EdgeInsets.all(16), child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-      Row(children: [Icon(Icons.qr_code, color: t.colorScheme.primary), const SizedBox(width: 8), Text('绑定设备', style: t.textTheme.titleMedium)]), const Divider(),
-      Text('生成二维码供其他设备扫描绑定', style: t.textTheme.bodySmall?.copyWith(color: t.colorScheme.onSurfaceVariant)), const SizedBox(height: 12),
+      Row(children: [Icon(Icons.qr_code, color: t.colorScheme.primary), const SizedBox(width: 8), Text(l.bindDevice, style: t.textTheme.titleMedium)]), const Divider(),
+      Text(l.bindDeviceDesc, style: t.textTheme.bodySmall?.copyWith(color: t.colorScheme.onSurfaceVariant)), const SizedBox(height: 12),
       SizedBox(width: double.infinity, child: OutlinedButton.icon(
         onPressed: !s.isRunning ? null : () {
-          d.whenData((did) => tok.whenData((tk) => _showQr(ctx, c, did, tk)));
+          d.whenData((did) => tok.whenData((tk) => _showQr(ctx, c, did, tk, l)));
         },
-        icon: const Icon(Icons.qr_code), label: Text(s.isRunning ? '显示绑定二维码' : '请先启动服务'),
+        icon: const Icon(Icons.qr_code), label: Text(s.isRunning ? l.showBindQr : l.startServiceFirst),
       )),
     ])));
   }
 
-  void _showQr(BuildContext ctx, ServerConfig c, String did, String tk) async {
+  void _showQr(BuildContext ctx, ServerConfig c, String did, String tk, AppLocalizations l) async {
     final ips = await _getIps();
     final ip = ips.isNotEmpty ? ips.first : '127.0.0.1';
     final url = 'http://$ip:${c.port}/$did/$tk';
     showDialog(context: ctx, builder: (c) => AlertDialog(
-      title: const Text('绑定二维码'), content: Column(mainAxisSize: MainAxisSize.min, children: [
+      title: Text(l.bindQrTitle), content: Column(mainAxisSize: MainAxisSize.min, children: [
         QrImageView(data: url, version: QrVersions.auto, size: 250, backgroundColor: Colors.white),
         const SizedBox(height: 12),
         Text(ip, style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: Theme.of(ctx).colorScheme.primary)),
@@ -159,18 +159,18 @@ class ServerPage extends ConsumerWidget {
         Text(url, style: const TextStyle(fontSize: 10, fontFamily: 'monospace')),
       ]),
       actions: [
-        TextButton(onPressed: () { Clipboard.setData(ClipboardData(text: url)); ScaffoldMessenger.of(ctx).showSnackBar(const SnackBar(content: Text('链接已复制'), behavior: SnackBarBehavior.floating)); }, child: const Text('复制链接')),
-        TextButton(onPressed: () => Navigator.pop(c), child: const Text('关闭')),
+        TextButton(onPressed: () { Clipboard.setData(ClipboardData(text: url)); ScaffoldMessenger.of(ctx).showSnackBar(SnackBar(content: Text(l.linkCopied), behavior: SnackBarBehavior.floating)); }, child: Text(l.copyLink)),
+        TextButton(onPressed: () => Navigator.pop(c), child: Text(l.close)),
       ],
     ));
   }
 
-  Widget _logCard(ThemeData t, List<String> logs, WidgetRef ref) => Card(margin: const EdgeInsets.symmetric(horizontal: 16), child: Padding(padding: const EdgeInsets.all(16), child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-    Row(children: [Icon(Icons.article, color: t.colorScheme.primary), const SizedBox(width: 8), const Text('服务端日志', style: TextStyle(fontWeight: FontWeight.bold)), const Spacer(), if (logs.isNotEmpty) TextButton(onPressed: () => ref.read(serverLogProvider.notifier).state = [], child: const Text('清除'))]),
+  Widget _logCard(BuildContext ctx, ThemeData t, List<String> logs, WidgetRef ref) { final l = AppLocalizations.of(ctx); return Card(margin: const EdgeInsets.symmetric(horizontal: 16), child: Padding(padding: const EdgeInsets.all(16), child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+    Row(children: [Icon(Icons.article, color: t.colorScheme.primary), const SizedBox(width: 8), Text(l.serverLog, style: const TextStyle(fontWeight: FontWeight.bold)), const Spacer(), if (logs.isNotEmpty) TextButton(onPressed: () => ref.read(serverLogProvider.notifier).state = [], child: Text(l.clearLogs))]),
     const Divider(),
-    if (logs.isEmpty) const Padding(padding: EdgeInsets.all(16), child: Center(child: Text('暂无日志', style: TextStyle(color: Colors.grey))))
+    if (logs.isEmpty) Padding(padding: const EdgeInsets.all(16), child: Center(child: Text(l.noLogs, style: const TextStyle(color: Colors.grey))))
     else SizedBox(height: 200, child: ListView.builder(itemCount: logs.length, itemBuilder: (_, i) => Padding(padding: const EdgeInsets.symmetric(vertical: 2), child: Text(logs[i], style: const TextStyle(fontSize: 12, fontFamily: 'monospace'))))),
-  ])));
+  ]))); }
 
   Widget _netCard(BuildContext ctx, ThemeData t, AppLocalizations l) => Card(margin: const EdgeInsets.symmetric(horizontal: 16), child: Padding(padding: const EdgeInsets.all(16), child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
     Row(children: [Icon(Icons.wifi, color: t.colorScheme.primary), const SizedBox(width: 8), Text(l.networkInfo, style: t.textTheme.titleMedium)]), const Divider(),
