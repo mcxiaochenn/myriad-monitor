@@ -21,10 +21,10 @@ case "$PLATFORM" in
     # 删除 windows/ 让 flutter create 完全重建（避免 "Wrote 0 files"）
     rm -rf windows/
     flutter create --project-name myriad_monitor --platforms windows .
-    # 恢复自定义文件
+    # 恢复自定义文件（不恢复 Runner.rc，测试是否是 Runner.rc 编码问题）
     git checkout -- lib/
-    cp /tmp/win_backup/Runner.rc windows/runner/Runner.rc 2>/dev/null || true
-    cp -r /tmp/win_backup/resources/* windows/runner/resources/ 2>/dev/null || true
+    # cp /tmp/win_backup/Runner.rc windows/runner/Runner.rc 2>/dev/null || true
+    # cp -r /tmp/win_backup/resources/* windows/runner/resources/ 2>/dev/null || true
     cp /tmp/win_backup/installer.iss windows/ 2>/dev/null || true
     ;;
   macos)
