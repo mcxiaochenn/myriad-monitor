@@ -11,7 +11,10 @@ import '../core/constants.dart';
 import 'system_info_collector.dart';
 import 'windows_collector.dart';
 
-/// CORS 响应头（允许跨域访问）
+/// CORS 响应头
+///
+/// Allow-Origin 为 * 是有意设计：本服务面向局域网内任意设备，
+/// 真正的访问控制依赖 URL 路径中的 SHA256 access_token。
 const _corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Methods': 'GET, OPTIONS',
