@@ -35,21 +35,28 @@ jobs:
       - uses: subosito/flutter-action@v2
         with: { channel: stable }
       - run: bash .github/scripts/build.sh ${{ inputs.platform }}
+
+      # ── 收集产物到统一目录 ──
+      - name: Collect artifacts
+        shell: bash
+        run: |
+          mkdir -p artifacts
+          PLATFORM="${{ inputs.platform }}"
+          case "$PLATFORM" in
+            windows)
+              cp -r build/windows/x64/runner/Release/* artifacts/ ;;
+            macos)
+              cp -r build/macos/Build/Products/Release/* artifacts/ ;;
+            linux)
+              cp -r build/linux/x64/release/bundle/* artifacts/ ;;
+            android)
+              cp build/app/outputs/flutter-apk/app-release.apk artifacts/
+              cp build/app/outputs/flutter-apk/app-debug.apk artifacts/ ;;
+            ios)
+              cp -r build/ios/iphoneos/* artifacts/ ;;
+          esac
+
       - uses: actions/upload-artifact@v7
-        if: inputs.platform == 'windows'
-        with: { name: windows-build, path: build/windows/x64/runner/Release/ }
-      - uses: actions/upload-artifact@v7
-        if: inputs.platform == 'macos'
-        with: { name: macos-build, path: build/macos/Build/Products/Release/ }
-      - uses: actions/upload-artifact@v7
-        if: inputs.platform == 'linux'
-        with: { name: linux-build, path: build/linux/x64/release/bundle/ }
-      - uses: actions/upload-artifact@v7
-        if: inputs.platform == 'android'
-        with: { name: android-build-release, path: build/app/outputs/flutter-apk/app-release.apk }
-      - uses: actions/upload-artifact@v7
-        if: inputs.platform == 'android'
-        with: { name: android-build-debug, path: build/app/outputs/flutter-apk/app-debug.apk }
-      - uses: actions/upload-artifact@v7
-        if: inputs.platform == 'ios'
-        with: { name: ios-build, path: build/ios/iphoneos/ }
+        with:
+          name: ${{ inputs.platform }}-build
+          path: artifacts/

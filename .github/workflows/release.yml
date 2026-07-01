@@ -210,9 +210,7 @@ jobs:
     steps:
       - uses: actions/checkout@v7
       - uses: actions/download-artifact@v7
-        with: { name: android-build-release }
-      - uses: actions/download-artifact@v7
-        with: { name: android-build-debug }
+        with: { name: android-build, path: android-build/ }
       - run: bash .github/scripts/package.sh android
       - uses: actions/upload-artifact@v7
         with:

@@ -25,8 +25,8 @@ case "$PLATFORM" in
     cd linux-build && tar -czf "../myriad-monitor-${SUFFIX}-linux.tar.gz" . && cd ..
     ;;
   android)
-    mv app-release.apk "myriad-monitor-${SUFFIX}-android-release.apk"
-    mv app-debug.apk "myriad-monitor-${SUFFIX}-android-debug.apk"
+    mv android-build/app-release.apk "myriad-monitor-${SUFFIX}-android-release.apk"
+    mv android-build/app-debug.apk "myriad-monitor-${SUFFIX}-android-debug.apk"
     ;;
   *)
     echo "未知平台: $PLATFORM"; exit 1 ;;

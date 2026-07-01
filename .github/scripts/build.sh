@@ -10,20 +10,21 @@ PLATFORM="${1:?用法: build.sh <platform>}"
 
 echo "=== Building $PLATFORM (v${APP_VERSION:-dev}+${APP_BUILD_NUMBER:-0}) ==="
 
-# ── 平台特化步骤 ──
+# ── 平台特化步骤（flutter create 前后） ──
 case "$PLATFORM" in
   windows)
     flutter create --project-name myriad_monitor --platforms windows .
-    git checkout -- windows/runner/Runner.rc windows/runner/resources/ || true
+    # flutter create 会覆盖自定义 Runner.rc，恢复之
+    git checkout -- windows/runner/Runner.rc windows/runner/resources/ 2>/dev/null || true
     ;;
   macos)
     flutter create --project-name myriad_monitor --platforms macos .
-    git checkout -- macos/Runner/Assets.xcassets/AppIcon.appiconset/ || true
+    git checkout -- macos/Runner/Assets.xcassets/AppIcon.appiconset/ 2>/dev/null || true
     ;;
   linux)
     sudo apt-get update && sudo apt-get install -y ninja-build libgtk-3-dev
     flutter create --project-name myriad_monitor --platforms linux .
-    git checkout -- linux/packaging/icons/ || true
+    git checkout -- linux/packaging/icons/ 2>/dev/null || true
     ;;
   android)
     flutter create --project-name myriad_monitor --platforms android .
@@ -40,21 +41,32 @@ EOF
     ;;
   ios)
     flutter create --project-name myriad_monitor --platforms ios .
-    echo 'platform :ios, "15.5"' | cat - ios/Podfile > ios/Podfile.tmp && mv ios/Podfile.tmp ios/Podfile
-    sed -i '' 's/IPHONEOS_DEPLOYMENT_TARGET = [0-9.]*/IPHONEOS_DEPLOYMENT_TARGET = 15.5/g' ios/Runner.xcodeproj/project.pbxproj
     ;;
   *)
     echo "未知平台: $PLATFORM"; exit 1 ;;
 esac
 
-# ── 通用步骤 ──
+# ── 安装依赖 ──
 flutter pub get
+
+# ── pub get 后的二次修补 ──
+case "$PLATFORM" in
+  ios)
+    # flutter create 不生成 Podfile，pub get 后才出现
+    if [ -f ios/Podfile ]; then
+      sed -i '' '1s/^/platform :ios, "15.5"\n/' ios/Podfile
+    fi
+    sed -i '' 's/IPHONEOS_DEPLOYMENT_TARGET = [0-9.]*/IPHONEOS_DEPLOYMENT_TARGET = 15.5/g' \
+      ios/Runner.xcodeproj/project.pbxproj
+    ;;
+esac
 
 # ── 构建 ──
 DART_DEFINES="--dart-define=APP_VERSION=${APP_VERSION:-dev} --dart-define=APP_BUILD_NUMBER=${APP_BUILD_NUMBER:-0}"
 
 case "$PLATFORM" in
   windows)
+    flutter clean
     eval flutter build windows --release "$DART_DEFINES"
     ;;
   macos)
@@ -68,7 +80,9 @@ case "$PLATFORM" in
     eval flutter build apk --debug "$DART_DEFINES" --build-number="${APP_BUILD_NUMBER:-0}"
     ;;
   ios)
-    eval flutter build ios --release --no-codesign "$DART_DEFINES" -- CODE_SIGNING_ALLOWED=NO
+    flutter build ios --release --no-codesign \
+      --dart-define=APP_VERSION="${APP_VERSION:-dev}" \
+      --dart-define=APP_BUILD_NUMBER="${APP_BUILD_NUMBER:-0}"
     ;;
 esac
 
