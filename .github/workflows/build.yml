@@ -90,7 +90,7 @@ jobs:
     secrets: inherit
 
   # ===================================================================
-  # 打包（build 模式：简单打包）
+  # 打包（调用 package.sh）
   # ===================================================================
   package-windows:
     name: Package Windows
@@ -98,23 +98,17 @@ jobs:
     if: always() && needs.build-windows.result == 'success'
     runs-on: ubuntu-latest
     env:
-      VER: ${{ needs.version.outputs.version_name || 'dev' }}
-      CODE: ${{ needs.version.outputs.version_code || '0' }}
+      APP_VERSION: ${{ needs.version.outputs.version_name || 'dev' }}
+      APP_BUILD_NUMBER: ${{ needs.version.outputs.version_code || '0' }}
     steps:
+      - uses: actions/checkout@v7
       - uses: actions/download-artifact@v7
-        with:
-          name: windows-build
-          path: windows-build/
-
-      - name: Create ZIP
-        run: |
-          SUFFIX=$([[ "$CODE" != "0" ]] && echo "v${VER}_${CODE}" || echo "dev")
-          cd windows-build && zip -r "../myriad-monitor-${SUFFIX}-windows.zip" .
-
+        with: { name: windows-build, path: windows-build/ }
+      - run: bash .github/scripts/package.sh windows
       - uses: actions/upload-artifact@v7
         with:
           name: windows-release
-          path: myriad-monitor-*-windows.zip
+          path: myriad-monitor-*-windows-portable.zip
 
   package-macos:
     name: Package macOS
@@ -122,19 +116,13 @@ jobs:
     if: always() && needs.build-macos.result == 'success'
     runs-on: ubuntu-latest
     env:
-      VER: ${{ needs.version.outputs.version_name || 'dev' }}
-      CODE: ${{ needs.version.outputs.version_code || '0' }}
+      APP_VERSION: ${{ needs.version.outputs.version_name || 'dev' }}
+      APP_BUILD_NUMBER: ${{ needs.version.outputs.version_code || '0' }}
     steps:
+      - uses: actions/checkout@v7
       - uses: actions/download-artifact@v7
-        with:
-          name: macos-build
-          path: macos-build/
-
-      - name: Create ZIP
-        run: |
-          SUFFIX=$([[ "$CODE" != "0" ]] && echo "v${VER}_${CODE}" || echo "dev")
-          cd macos-build && zip -r "../myriad-monitor-${SUFFIX}-macos.zip" .
-
+        with: { name: macos-build, path: macos-build/ }
+      - run: bash .github/scripts/package.sh macos
       - uses: actions/upload-artifact@v7
         with:
           name: macos-release
@@ -146,19 +134,13 @@ jobs:
     if: always() && needs.build-linux.result == 'success'
     runs-on: ubuntu-latest
     env:
-      VER: ${{ needs.version.outputs.version_name || 'dev' }}
-      CODE: ${{ needs.version.outputs.version_code || '0' }}
+      APP_VERSION: ${{ needs.version.outputs.version_name || 'dev' }}
+      APP_BUILD_NUMBER: ${{ needs.version.outputs.version_code || '0' }}
     steps:
+      - uses: actions/checkout@v7
       - uses: actions/download-artifact@v7
-        with:
-          name: linux-build
-          path: linux-build/
-
-      - name: Create tar.gz
-        run: |
-          SUFFIX=$([[ "$CODE" != "0" ]] && echo "v${VER}_${CODE}" || echo "dev")
-          cd linux-build && tar -czf "../myriad-monitor-${SUFFIX}-linux.tar.gz" .
-
+        with: { name: linux-build, path: linux-build/ }
+      - run: bash .github/scripts/package.sh linux
       - uses: actions/upload-artifact@v7
         with:
           name: linux-release
@@ -170,28 +152,19 @@ jobs:
     if: always() && needs.build-android.result == 'success'
     runs-on: ubuntu-latest
     env:
-      VER: ${{ needs.version.outputs.version_name || 'dev' }}
-      CODE: ${{ needs.version.outputs.version_code || '0' }}
+      APP_VERSION: ${{ needs.version.outputs.version_name || 'dev' }}
+      APP_BUILD_NUMBER: ${{ needs.version.outputs.version_code || '0' }}
     steps:
+      - uses: actions/checkout@v7
       - uses: actions/download-artifact@v7
-        with:
-          name: android-build-release
-
+        with: { name: android-build-release }
       - uses: actions/download-artifact@v7
-        with:
-          name: android-build-debug
-
-      - name: Rename APKs
-        run: |
-          SUFFIX=$([[ "$CODE" != "0" ]] && echo "v${VER}_${CODE}" || echo "dev")
-          mv app-release.apk "myriad-monitor-${SUFFIX}-android-release.apk"
-          mv app-debug.apk "myriad-monitor-${SUFFIX}-android-debug.apk"
-
+        with: { name: android-build-debug }
+      - run: bash .github/scripts/package.sh android
       - uses: actions/upload-artifact@v7
         with:
           name: android-release
           path: myriad-monitor-*-android-release.apk
-
       - uses: actions/upload-artifact@v7
         with:
           name: android-debug

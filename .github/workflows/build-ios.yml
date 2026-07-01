@@ -1,14 +1,9 @@
 name: Build iOS
-
 on:
   workflow_call:
     inputs:
-      app_version:
-        required: true
-        type: string
-      build_number:
-        required: true
-        type: string
+      app_version: { required: true, type: string }
+      build_number: { required: true, type: string }
 
 jobs:
   build:
@@ -20,19 +15,8 @@ jobs:
     steps:
       - uses: actions/checkout@v7
       - uses: subosito/flutter-action@v2
-        with:
-          channel: stable
-      - run: flutter create --project-name myriad_monitor --platforms ios .
-      - name: Bump iOS deployment target
-        run: |
-          echo 'platform :ios, "15.5"' | cat - ios/Podfile > ios/Podfile.tmp && mv ios/Podfile.tmp ios/Podfile
-          sed -i '' 's/IPHONEOS_DEPLOYMENT_TARGET = [0-9.]*/IPHONEOS_DEPLOYMENT_TARGET = 15.5/g' ios/Runner.xcodeproj/project.pbxproj
-      - run: flutter pub get
-      - run: >-
-          flutter build ios --release --no-codesign
-          --dart-define=APP_VERSION=${{ inputs.app_version }}
-          --dart-define=APP_BUILD_NUMBER=${{ inputs.build_number }}
-          -- CODE_SIGNING_ALLOWED=NO
+        with: { channel: stable }
+      - run: bash .github/scripts/build.sh ios
       - uses: actions/upload-artifact@v7
         with:
           name: ios-build
