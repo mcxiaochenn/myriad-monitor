@@ -83,15 +83,12 @@ class AppTheme {
       colorSchemeSeed: primaryColor,
       brightness: Brightness.dark,
       fontFamily: 'Roboto',
-      scaffoldBackgroundColor: const Color(0xFF121212),
       appBarTheme: const AppBarTheme(
         centerTitle: true,
         elevation: 0,
-        backgroundColor: Color(0xFF1E1E1E),
       ),
       cardTheme: CardThemeData(
         elevation: 2,
-        color: const Color(0xFF1E1E1E),
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(UIConstants.defaultBorderRadius),
         ),
