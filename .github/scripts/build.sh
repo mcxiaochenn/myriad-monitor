@@ -14,20 +14,21 @@ echo "=== Building $PLATFORM (v${APP_VERSION:-dev}+${APP_BUILD_NUMBER:-0}) ==="
 case "$PLATFORM" in
   windows)
     flutter create --project-name myriad_monitor --platforms windows .
-    # flutter create 会覆盖自定义 Runner.rc，恢复之
-    git checkout -- windows/runner/Runner.rc windows/runner/resources/ 2>/dev/null || true
+    # flutter create 覆盖 lib/ 和 windows/，恢复自定义文件
+    git checkout -- lib/ windows/runner/Runner.rc windows/runner/resources/
     ;;
   macos)
     flutter create --project-name myriad_monitor --platforms macos .
-    git checkout -- macos/Runner/Assets.xcassets/AppIcon.appiconset/ 2>/dev/null || true
+    git checkout -- lib/ macos/Runner/Assets.xcassets/AppIcon.appiconset/
     ;;
   linux)
     sudo apt-get update && sudo apt-get install -y ninja-build libgtk-3-dev
     flutter create --project-name myriad_monitor --platforms linux .
-    git checkout -- linux/packaging/icons/ 2>/dev/null || true
+    git checkout -- lib/ linux/packaging/icons/
     ;;
   android)
     flutter create --project-name myriad_monitor --platforms android .
+    git checkout -- lib/
     if [ -n "${ANDROID_KEYSTORE_BASE64:-}" ]; then
       echo "$ANDROID_KEYSTORE_BASE64" | base64 --decode > android/app/upload-keystore.jks
       cat <<EOF > android/key.properties
@@ -41,6 +42,7 @@ EOF
     ;;
   ios)
     flutter create --project-name myriad_monitor --platforms ios .
+    git checkout -- lib/
     ;;
   *)
     echo "未知平台: $PLATFORM"; exit 1 ;;
@@ -63,7 +65,6 @@ DART_DEFINES="--dart-define=APP_VERSION=${APP_VERSION:-dev} --dart-define=APP_BU
 
 case "$PLATFORM" in
   windows)
-    flutter clean
     eval flutter build windows --release "$DART_DEFINES"
     ;;
   macos)
