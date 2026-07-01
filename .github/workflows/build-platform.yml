@@ -19,7 +19,7 @@ jobs:
     name: Build ${{ inputs.platform }}
     runs-on: >-
       ${{
-        (inputs.platform == 'windows' && 'windows-2019') ||
+        (inputs.platform == 'windows' && 'windows-latest') ||
         (inputs.platform == 'macos' && 'macos-latest') ||
         (inputs.platform == 'ios' && 'macos-latest') ||
         'ubuntu-latest'

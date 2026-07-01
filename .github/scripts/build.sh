@@ -13,8 +13,19 @@ echo "=== Building $PLATFORM (v${APP_VERSION:-dev}+${APP_BUILD_NUMBER:-0}) ==="
 # ── 平台特化步骤（flutter create 前后） ──
 case "$PLATFORM" in
   windows)
+    # 保存自定义文件
+    mkdir -p /tmp/win_backup
+    cp windows/runner/Runner.rc /tmp/win_backup/ 2>/dev/null || true
+    cp -r windows/runner/resources/ /tmp/win_backup/resources/ 2>/dev/null || true
+    cp windows/installer.iss /tmp/win_backup/ 2>/dev/null || true
+    # 删除 windows/ 让 flutter create 完全重建（避免 "Wrote 0 files"）
+    rm -rf windows/
     flutter create --project-name myriad_monitor --platforms windows .
-    git checkout -- lib/ windows/runner/Runner.rc windows/runner/resources/ 2>/dev/null || true
+    # 恢复自定义文件
+    git checkout -- lib/
+    cp /tmp/win_backup/Runner.rc windows/runner/Runner.rc 2>/dev/null || true
+    cp -r /tmp/win_backup/resources/* windows/runner/resources/ 2>/dev/null || true
+    cp /tmp/win_backup/installer.iss windows/ 2>/dev/null || true
     ;;
   macos)
     flutter create --project-name myriad_monitor --platforms macos .
@@ -64,7 +75,7 @@ DART_DEFINES="--dart-define=APP_VERSION=${APP_VERSION:-dev} --dart-define=APP_BU
 
 case "$PLATFORM" in
   windows)
-    eval flutter build windows --release --verbose "$DART_DEFINES" 2>&1 | tail -100
+    eval flutter build windows --release "$DART_DEFINES"
     ;;
   macos)
     eval flutter build macos --release "$DART_DEFINES"
