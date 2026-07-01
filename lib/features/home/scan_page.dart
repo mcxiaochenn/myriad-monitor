@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'dart:io';
 import 'package:flutter/material.dart';
 import '../../client/device_manager.dart';
+import '../../l10n/app_localizations.dart';
 
 /// 扫一扫添加设备页面
 ///
@@ -30,13 +31,13 @@ class _ScanPageState extends State<ScanPage> {
     try {
       final uri = Uri.tryParse(input.trim());
       if (uri == null || !uri.hasScheme) {
-        setState(() { _result = '无效的链接格式'; _checking = false; });
+        setState(() { _result = AppLocalizations.of(context).invalidLinkFormat; _checking = false; });
         return;
       }
 
       final segs = uri.pathSegments;
       if (segs.length < 2) {
-        setState(() { _result = '链接格式不正确（缺少设备ID和令牌）'; _checking = false; });
+        setState(() { _result = AppLocalizations.of(context).linkFormatIncorrect; _checking = false; });
         return;
       }
 
@@ -66,12 +67,12 @@ class _ScanPageState extends State<ScanPage> {
         final body = await infoResp.transform(utf8.decoder).join();
         final data = jsonDecode(body) as Map<String, dynamic>;
         setState(() {
-          _result = '✅ 设备已连接';
+          _result = '✅ ${AppLocalizations.of(context).deviceConnected}';
           _deviceData = data;
           _checking = false;
         });
       } else if (infoResp.statusCode == 403) {
-        setState(() { _result = '⚠️ 令牌无效（403），请联系设备管理员'; _checking = false; });
+        setState(() { _result = '⚠️ ${AppLocalizations.of(context).tokenInvalid}'; _checking = false; });
       } else {
         setState(() { _result = '设备异常（${infoResp.statusCode}）'; _checking = false; });
       }
@@ -106,7 +107,7 @@ class _ScanPageState extends State<ScanPage> {
     final data = _deviceData;
 
     return Scaffold(
-      appBar: AppBar(title: const Text('扫一扫添加设备'), centerTitle: true),
+      appBar: AppBar(title: Text(AppLocalizations.of(context).scanTitle), centerTitle: true),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(24),
         child: Column(
@@ -114,7 +115,7 @@ class _ScanPageState extends State<ScanPage> {
           children: [
             Icon(Icons.qr_code_scanner, size: 80, color: theme.colorScheme.primary),
             const SizedBox(height: 24),
-            Text('扫描对方设备的二维码，\n或粘贴连接 URL',
+            Text(AppLocalizations.of(context).scanHint,
                 textAlign: TextAlign.center,
                 style: theme.textTheme.bodyLarge?.copyWith(color: theme.colorScheme.onSurfaceVariant)),
             const SizedBox(height: 32),
@@ -122,7 +123,7 @@ class _ScanPageState extends State<ScanPage> {
               controller: _pasteCtrl,
               maxLines: 3,
               decoration: InputDecoration(
-                labelText: '粘贴二维码内容',
+                labelText: AppLocalizations.of(context).scanPasteHint,
                 hintText: 'http://192.168.1.100:19191/device-id/token',
                 prefixIcon: const Icon(Icons.paste),
                 border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
@@ -134,7 +135,7 @@ class _ScanPageState extends State<ScanPage> {
               child: FilledButton.icon(
                 onPressed: _checking ? null : () => _parseAndVerify(_pasteCtrl.text),
                 icon: _checking ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white)) : const Icon(Icons.wifi_find),
-                label: Text(_checking ? '验证中...' : '检查连通性'),
+                label: Text(_checking ? AppLocalizations.of(context).verifying : AppLocalizations.of(context).checkConnection),
               ),
             ),
             if (_result != null) ...[
@@ -147,16 +148,16 @@ class _ScanPageState extends State<ScanPage> {
               Card(
                 shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                 child: Padding(padding: const EdgeInsets.all(16), child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                  Text('设备信息', style: theme.textTheme.titleMedium),
+                  Text(AppLocalizations.of(context).deviceInfoPreview, style: theme.textTheme.titleMedium),
                   const Divider(),
-                  _row('设备名称', (data['deviceName'] as String?) ?? '--'),
+                  _row(AppLocalizations.of(context).deviceNameLabel, (data['deviceName'] as String?) ?? '--'),
                   _row('设备 ID', ((data['deviceId'] as String?) ?? '--').length > 16 ? ((data['deviceId'] as String?) ?? '--').substring(0, 8) : ((data['deviceId'] as String?) ?? '--')),
                   _row('CPU 使用率', '${((data['cpuUsage'] as num?) ?? 0).toStringAsFixed(1)}%'),
                   _row('内存', '${_fmtBytes((data['memoryUsed'] as int?) ?? 0)} / ${_fmtBytes((data['memoryTotal'] as int?) ?? 0)}'),
                 ])),
               ),
               const SizedBox(height: 16),
-              SizedBox(width: double.infinity, child: FilledButton.icon(onPressed: _import, icon: const Icon(Icons.download), label: const Text('导入到主页'))),
+              SizedBox(width: double.infinity, child: FilledButton.icon(onPressed: _import, icon: const Icon(Icons.download), label: Text(AppLocalizations.of(context).importDevice))),
             ],
           ],
         ),
