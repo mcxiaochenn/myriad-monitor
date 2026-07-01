@@ -14,8 +14,7 @@ echo "=== Building $PLATFORM (v${APP_VERSION:-dev}+${APP_BUILD_NUMBER:-0}) ==="
 case "$PLATFORM" in
   windows)
     flutter create --project-name myriad_monitor --platforms windows .
-    # flutter create 覆盖 lib/ 和 windows/，恢复自定义文件
-    git checkout -- lib/ windows/runner/Runner.rc windows/runner/resources/
+    git checkout -- lib/ windows/runner/Runner.rc windows/runner/resources/ 2>/dev/null || true
     ;;
   macos)
     flutter create --project-name myriad_monitor --platforms macos .
