@@ -51,7 +51,7 @@ jobs:
   build-windows:
     name: Build Windows
     needs: [resolve]
-    uses: ./.github/workflows/build/windows.yml
+    uses: ./.github/workflows/build-windows.yml
     with:
       app_version: ${{ needs.resolve.outputs.version_name }}
       build_number: ${{ needs.resolve.outputs.version_code }}
@@ -60,7 +60,7 @@ jobs:
   build-macos:
     name: Build macOS
     needs: [resolve]
-    uses: ./.github/workflows/build/macos.yml
+    uses: ./.github/workflows/build-macos.yml
     with:
       app_version: ${{ needs.resolve.outputs.version_name }}
       build_number: ${{ needs.resolve.outputs.version_code }}
@@ -69,7 +69,7 @@ jobs:
   build-linux:
     name: Build Linux
     needs: [resolve]
-    uses: ./.github/workflows/build/linux.yml
+    uses: ./.github/workflows/build-linux.yml
     with:
       app_version: ${{ needs.resolve.outputs.version_name }}
       build_number: ${{ needs.resolve.outputs.version_code }}
@@ -78,7 +78,7 @@ jobs:
   build-android:
     name: Build Android
     needs: [resolve]
-    uses: ./.github/workflows/build/android.yml
+    uses: ./.github/workflows/build-android.yml
     with:
       app_version: ${{ needs.resolve.outputs.version_name }}
       build_number: ${{ needs.resolve.outputs.version_code }}
@@ -87,7 +87,7 @@ jobs:
   build-ios:
     name: Build iOS
     needs: [resolve]
-    uses: ./.github/workflows/build/ios.yml
+    uses: ./.github/workflows/build-ios.yml
     with:
       app_version: ${{ needs.resolve.outputs.version_name }}
       build_number: ${{ needs.resolve.outputs.version_code }}

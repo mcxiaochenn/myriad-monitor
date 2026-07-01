@@ -43,7 +43,7 @@ jobs:
     name: Build Windows
     needs: [version]
     if: always() && (needs.version.result == 'success' || needs.version.result == 'skipped')
-    uses: ./.github/workflows/build/windows.yml
+    uses: ./.github/workflows/build-windows.yml
     with:
       app_version: ${{ needs.version.outputs.version_name || 'dev' }}
       build_number: ${{ needs.version.outputs.version_code || '0' }}
@@ -53,7 +53,7 @@ jobs:
     name: Build macOS
     needs: [version]
     if: always() && (needs.version.result == 'success' || needs.version.result == 'skipped')
-    uses: ./.github/workflows/build/macos.yml
+    uses: ./.github/workflows/build-macos.yml
     with:
       app_version: ${{ needs.version.outputs.version_name || 'dev' }}
       build_number: ${{ needs.version.outputs.version_code || '0' }}
@@ -63,7 +63,7 @@ jobs:
     name: Build Linux
     needs: [version]
     if: always() && (needs.version.result == 'success' || needs.version.result == 'skipped')
-    uses: ./.github/workflows/build/linux.yml
+    uses: ./.github/workflows/build-linux.yml
     with:
       app_version: ${{ needs.version.outputs.version_name || 'dev' }}
       build_number: ${{ needs.version.outputs.version_code || '0' }}
@@ -73,7 +73,7 @@ jobs:
     name: Build Android
     needs: [version]
     if: always() && (needs.version.result == 'success' || needs.version.result == 'skipped')
-    uses: ./.github/workflows/build/android.yml
+    uses: ./.github/workflows/build-android.yml
     with:
       app_version: ${{ needs.version.outputs.version_name || 'dev' }}
       build_number: ${{ needs.version.outputs.version_code || '0' }}
@@ -83,7 +83,7 @@ jobs:
     name: Build iOS
     needs: [version]
     if: always() && (needs.version.result == 'success' || needs.version.result == 'skipped')
-    uses: ./.github/workflows/build/ios.yml
+    uses: ./.github/workflows/build-ios.yml
     with:
       app_version: ${{ needs.version.outputs.version_name || 'dev' }}
       build_number: ${{ needs.version.outputs.version_code || '0' }}

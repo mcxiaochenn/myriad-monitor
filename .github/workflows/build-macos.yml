@@ -1,0 +1,35 @@
+name: Build macOS
+
+on:
+  workflow_call:
+    inputs:
+      app_version:
+        required: true
+        type: string
+      build_number:
+        required: true
+        type: string
+
+jobs:
+  build:
+    name: Build macOS
+    runs-on: macos-latest
+    env:
+      APP_VERSION: ${{ inputs.app_version }}
+      APP_BUILD_NUMBER: ${{ inputs.build_number }}
+    steps:
+      - uses: actions/checkout@v7
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+      - run: flutter create --project-name myriad_monitor --platforms macos .
+      - run: git checkout -- macos/Runner/Assets.xcassets/AppIcon.appiconset/ || true
+      - run: flutter pub get
+      - run: >-
+          flutter build macos --release
+          --dart-define=APP_VERSION=${{ inputs.app_version }}
+          --dart-define=APP_BUILD_NUMBER=${{ inputs.build_number }}
+      - uses: actions/upload-artifact@v7
+        with:
+          name: macos-build
+          path: build/macos/Build/Products/Release/
