@@ -51,9 +51,8 @@ jobs:
   build-windows:
     name: Build Windows
     needs: [resolve]
-    uses: ./.github/workflows/build-platforms.yml
+    uses: ./.github/workflows/build/windows.yml
     with:
-      platform: windows
       app_version: ${{ needs.resolve.outputs.version_name }}
       build_number: ${{ needs.resolve.outputs.version_code }}
     secrets: inherit
@@ -61,9 +60,8 @@ jobs:
   build-macos:
     name: Build macOS
     needs: [resolve]
-    uses: ./.github/workflows/build-platforms.yml
+    uses: ./.github/workflows/build/macos.yml
     with:
-      platform: macos
       app_version: ${{ needs.resolve.outputs.version_name }}
       build_number: ${{ needs.resolve.outputs.version_code }}
     secrets: inherit
@@ -71,9 +69,8 @@ jobs:
   build-linux:
     name: Build Linux
     needs: [resolve]
-    uses: ./.github/workflows/build-platforms.yml
+    uses: ./.github/workflows/build/linux.yml
     with:
-      platform: linux
       app_version: ${{ needs.resolve.outputs.version_name }}
       build_number: ${{ needs.resolve.outputs.version_code }}
     secrets: inherit
@@ -81,9 +78,8 @@ jobs:
   build-android:
     name: Build Android
     needs: [resolve]
-    uses: ./.github/workflows/build-platforms.yml
+    uses: ./.github/workflows/build/android.yml
     with:
-      platform: android
       app_version: ${{ needs.resolve.outputs.version_name }}
       build_number: ${{ needs.resolve.outputs.version_code }}
     secrets: inherit
@@ -91,9 +87,8 @@ jobs:
   build-ios:
     name: Build iOS
     needs: [resolve]
-    uses: ./.github/workflows/build-platforms.yml
+    uses: ./.github/workflows/build/ios.yml
     with:
-      platform: ios
       app_version: ${{ needs.resolve.outputs.version_name }}
       build_number: ${{ needs.resolve.outputs.version_code }}
     secrets: inherit
