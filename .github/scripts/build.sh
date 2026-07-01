@@ -52,10 +52,7 @@ flutter pub get
 # ── pub get 后的二次修补 ──
 case "$PLATFORM" in
   ios)
-    # flutter create 不生成 Podfile，pub get 后才出现
-    if [ -f ios/Podfile ]; then
-      sed -i '' '1s/^/platform :ios, "15.5"\n/' ios/Podfile
-    fi
+    # project.pbxproj 的 deployment target 在 flutter create 后已存在
     sed -i '' 's/IPHONEOS_DEPLOYMENT_TARGET = [0-9.]*/IPHONEOS_DEPLOYMENT_TARGET = 15.5/g' \
       ios/Runner.xcodeproj/project.pbxproj
     ;;
