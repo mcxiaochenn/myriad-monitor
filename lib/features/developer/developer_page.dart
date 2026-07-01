@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../../core/app_logger.dart';
 import '../../core/constants.dart';
+import '../../l10n/app_localizations.dart';
 
 /// 开发者选项页面 — 在关于页连击 15 下应用图标后进入
 class DeveloperPage extends StatelessWidget {
@@ -12,15 +13,16 @@ class DeveloperPage extends StatelessWidget {
   Widget build(BuildContext context) {
     final logger = AppLogger();
     final theme = Theme.of(context);
+    final l10n = AppLocalizations.of(context);
 
     return Scaffold(
-      appBar: AppBar(title: const Text('开发者选项'), centerTitle: true),
+      appBar: AppBar(title: Text(l10n.navAbout), centerTitle: true),
       body: ListView(children: [
-        _section(theme, '应用日志', Icons.article),
+        _section(theme, l10n.devAppLog, Icons.article),
         SizedBox(
           height: 350,
           child: logger.entries.isEmpty
-              ? const Center(child: Text('暂无日志', style: TextStyle(color: Colors.grey)))
+              ? Center(child: Text(l10n.noLogs, style: const TextStyle(color: Colors.grey)))
               : ListView.builder(
                   itemCount: logger.entries.length,
                   itemBuilder: (_, i) => Padding(
@@ -31,21 +33,21 @@ class DeveloperPage extends StatelessWidget {
                 ),
         ),
         const Divider(indent: 16, endIndent: 16),
-        _section(theme, '应用信息', Icons.info),
-        _row('版本', 'v${AppConfigConstants.appVersion}'),
+        _section(theme, l10n.devAppInfo, Icons.info),
+        _row(l10n.devVersion, 'v${AppConfigConstants.appVersion}'),
         _row('Build', AppConfigConstants.appBuildNumber),
-        _row('Platform', _platform),
-        _row('日志目录', logger.logDir ?? '未初始化'),
+        _row(l10n.devPlatform, _platform),
+        _row(l10n.devLogDir, logger.logDir ?? l10n.devLogDirUninit),
         const Divider(indent: 16, endIndent: 16),
-        _section(theme, '操作', Icons.build),
+        _section(theme, l10n.devActions, Icons.build),
         ListTile(
           leading: const Icon(Icons.copy_all),
-          title: const Text('复制全部日志'),
+          title: Text(l10n.devCopyAllLogs),
           onTap: () {
             final text = logger.entries.join('\n');
             Clipboard.setData(ClipboardData(text: text));
             ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(content: Text('日志已复制'), behavior: SnackBarBehavior.floating),
+              SnackBar(content: Text(l10n.devLogsCopied), behavior: SnackBarBehavior.floating),
             );
           },
         ),
